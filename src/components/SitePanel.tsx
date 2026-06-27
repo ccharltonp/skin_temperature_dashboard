@@ -1,14 +1,30 @@
 "use client";
 
-import { SkinTempResult } from "@/lib/skinTemp";
+import { SkinTempResult, computeSkinTemp, DEFAULT_EMISSIVITY } from "@/lib/skinTemp";
 import SiteChart from "./SiteChart";
 
 interface Props {
   site: SkinTempResult;
+  globalEmissivity: number;
+  siteEmissivity: number | undefined;
+  onSiteEmissivityChange: (eps: number | undefined) => void;
   onClose: () => void;
 }
 
-export default function SitePanel({ site, onClose }: Props) {
+export default function SitePanel({
+  site,
+  globalEmissivity,
+  siteEmissivity,
+  onSiteEmissivityChange,
+  onClose,
+}: Props) {
+  const hasOverride = siteEmissivity !== undefined;
+  const eps = hasOverride ? siteEmissivity : globalEmissivity;
+  const skinTempC =
+    site.lwout != null && site.lwin != null
+      ? computeSkinTemp(site.lwout, site.lwin, eps)
+      : null;
+
   const ts = site.timestamp
     ? new Date(site.timestamp).toLocaleString("en-GB", {
         dateStyle: "short",
@@ -18,6 +34,7 @@ export default function SitePanel({ site, onClose }: Props) {
 
   return (
     <div className="bg-slate-800 rounded-xl p-4 flex flex-col gap-3">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white">{site.siteName}</h2>
@@ -31,10 +48,11 @@ export default function SitePanel({ site, onClose }: Props) {
         </button>
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <Stat
           label="Skin temp"
-          value={site.skinTempC != null ? `${site.skinTempC.toFixed(1)} °C` : "—"}
+          value={skinTempC != null ? `${skinTempC.toFixed(1)} °C` : "—"}
           highlight
         />
         <Stat
@@ -44,8 +62,8 @@ export default function SitePanel({ site, onClose }: Props) {
         <Stat
           label="ΔT (skin−air)"
           value={
-            site.skinTempC != null && site.ta != null
-              ? `${(site.skinTempC - site.ta).toFixed(1)} °C`
+            skinTempC != null && site.ta != null
+              ? `${(skinTempC - site.ta).toFixed(1)} °C`
               : "—"
           }
         />
@@ -63,7 +81,50 @@ export default function SitePanel({ site, onClose }: Props) {
         />
       </div>
 
-      <SiteChart siteId={site.siteId} siteName={site.siteName} days={7} />
+      {/* Per-site emissivity */}
+      <div className="bg-slate-700/60 rounded-lg p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-slate-300">
+            Site emissivity (ε)
+            {hasOverride && (
+              <span className="ml-2 bg-orange-500/20 text-orange-300 text-[10px] px-1.5 py-0.5 rounded">
+                overridden
+              </span>
+            )}
+          </span>
+          {hasOverride && (
+            <button
+              onClick={() => onSiteEmissivityChange(undefined)}
+              className="text-[10px] text-slate-400 hover:text-white underline"
+            >
+              reset to global ({globalEmissivity.toFixed(2)})
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            min="0.01"
+            max="1.0"
+            step="0.01"
+            value={eps}
+            onChange={(e) => onSiteEmissivityChange(parseFloat(e.target.value))}
+            className="flex-1 accent-orange-400"
+          />
+          <span className="text-sm font-mono text-orange-300 w-10 text-right">
+            {eps.toFixed(2)}
+          </span>
+        </div>
+
+        <p className="text-[10px] text-slate-500">
+          {hasOverride
+            ? "This site uses its own ε — global slider won't affect it."
+            : "Tracking global ε — drag to set a site-specific value."}
+        </p>
+      </div>
+
+      <SiteChart siteId={site.siteId} siteName={site.siteName} emissivity={eps} days={7} />
     </div>
   );
 }
@@ -80,9 +141,7 @@ function Stat({
   return (
     <div className="bg-slate-700/60 rounded-lg p-2">
       <p className="text-xs text-slate-400">{label}</p>
-      <p
-        className={`text-base font-semibold mt-0.5 ${highlight ? "text-orange-400" : "text-white"}`}
-      >
+      <p className={`text-base font-semibold mt-0.5 ${highlight ? "text-orange-400" : "text-white"}`}>
         {value}
       </p>
     </div>

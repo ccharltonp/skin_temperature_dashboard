@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -12,21 +12,30 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { format, parseISO } from "date-fns";
+import { computeSkinTemp, DEFAULT_EMISSIVITY } from "@/lib/skinTemp";
 
-interface SeriesPoint {
+interface RawPoint {
   timestamp: string;
   skinTempC: number | null;
   ta: number | null;
+  lwout: number | null;
+  lwin: number | null;
 }
 
 interface Props {
   siteId: string;
   siteName: string;
+  emissivity?: number;
   days?: number;
 }
 
-export default function SiteChart({ siteId, siteName, days = 7 }: Props) {
-  const [data, setData] = useState<SeriesPoint[]>([]);
+export default function SiteChart({
+  siteId,
+  siteName,
+  emissivity = DEFAULT_EMISSIVITY,
+  days = 7,
+}: Props) {
+  const [raw, setRaw] = useState<RawPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,11 +43,24 @@ export default function SiteChart({ siteId, siteName, days = 7 }: Props) {
     fetch(`/api/history?site=${siteId}&days=${days}`)
       .then((r) => r.json())
       .then((json) => {
-        setData(json.series ?? []);
+        setRaw(json.series ?? []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [siteId, days]);
+
+  // Re-derive skin temp from raw radiation whenever emissivity changes
+  const data = useMemo(
+    () =>
+      raw.map((p) => ({
+        ...p,
+        skinTempC:
+          p.lwout != null && p.lwin != null
+            ? computeSkinTemp(p.lwout, p.lwin, emissivity)
+            : null,
+      })),
+    [raw, emissivity]
+  );
 
   if (loading)
     return (
@@ -47,7 +69,7 @@ export default function SiteChart({ siteId, siteName, days = 7 }: Props) {
       </div>
     );
 
-  if (data.length === 0)
+  if (raw.length === 0)
     return (
       <div className="flex items-center justify-center h-48 text-slate-400">
         No data for {siteName}

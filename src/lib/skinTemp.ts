@@ -9,8 +9,8 @@
 // Reference: Liang et al. (2010), Scientific Reports (2022) flux-tower method.
 // ε = 0.97 is the standard broadband emissivity for vegetated / soil surfaces.
 
-const SIGMA = 5.670374419e-8; // Stefan-Boltzmann constant, W m⁻² K⁻⁴
-const EMISSIVITY = 0.97;      // Broadband surface emissivity
+export const SIGMA = 5.670374419e-8; // Stefan-Boltzmann constant, W m⁻² K⁻⁴
+export const DEFAULT_EMISSIVITY = 0.97; // Broadband surface emissivity for vegetated/soil surfaces
 
 export interface SkinTempResult {
   siteId: string;
@@ -25,11 +25,16 @@ export interface SkinTempResult {
   error?: string;
 }
 
-export function computeSkinTemp(lwout: number, lwin: number): number | null {
+export function computeSkinTemp(
+  lwout: number,
+  lwin: number,
+  emissivity: number = DEFAULT_EMISSIVITY
+): number | null {
+  if (emissivity <= 0 || emissivity > 1) return null;
   // Numerator must be positive (upwelling must exceed reflected downwelling)
-  const numerator = lwout - (1 - EMISSIVITY) * lwin;
+  const numerator = lwout - (1 - emissivity) * lwin;
   if (numerator <= 0) return null;
-  const TsK = Math.pow(numerator / (EMISSIVITY * SIGMA), 0.25);
+  const TsK = Math.pow(numerator / (emissivity * SIGMA), 0.25);
   return +(TsK - 273.15).toFixed(2);
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { SkinTempResult } from "@/lib/skinTemp";
+import { SkinTempResult, computeSkinTemp } from "@/lib/skinTemp";
 
 // Leaflet must be loaded client-side only
 const MapContainer = dynamic(
@@ -25,6 +25,7 @@ interface Props {
   sites: SkinTempResult[];
   selected: string | null;
   onSelect: (id: string) => void;
+  effectiveEmissivity: (siteId: string) => number;
 }
 
 function tempToColor(t: number | null): string {
@@ -39,7 +40,7 @@ function tempToColor(t: number | null): string {
   return "#7f1d1d";
 }
 
-export default function SiteMap({ sites, selected, onSelect }: Props) {
+export default function SiteMap({ sites, selected, onSelect, effectiveEmissivity }: Props) {
   return (
     <MapContainer
       center={[54.5, -3]}
@@ -51,29 +52,36 @@ export default function SiteMap({ sites, selected, onSelect }: Props) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {sites.map((s) => (
-        <CircleMarker
-          key={s.siteId}
-          center={[s.latitude, s.longitude]}
-          radius={selected === s.siteId ? 12 : 8}
-          pathOptions={{
-            fillColor: tempToColor(s.skinTempC),
-            color: selected === s.siteId ? "#fff" : "#0003",
-            weight: selected === s.siteId ? 2 : 1,
-            fillOpacity: 0.9,
-          }}
-          eventHandlers={{ click: () => onSelect(s.siteId) }}
-        >
-          <Tooltip>
-            <strong>{s.siteName}</strong>
-            <br />
-            {s.skinTempC !== null
-              ? `Skin temp: ${s.skinTempC.toFixed(1)} °C`
-              : "No data"}
-            {s.ta !== null && <><br />Air temp: {s.ta.toFixed(1)} °C</>}
-          </Tooltip>
-        </CircleMarker>
-      ))}
+      {sites.map((s) => {
+        const eps = effectiveEmissivity(s.siteId);
+        const skinTempC =
+          s.lwout != null && s.lwin != null
+            ? computeSkinTemp(s.lwout, s.lwin, eps)
+            : null;
+        return (
+          <CircleMarker
+            key={s.siteId}
+            center={[s.latitude, s.longitude]}
+            radius={selected === s.siteId ? 12 : 8}
+            pathOptions={{
+              fillColor: tempToColor(skinTempC),
+              color: selected === s.siteId ? "#fff" : "#0003",
+              weight: selected === s.siteId ? 2 : 1,
+              fillOpacity: 0.9,
+            }}
+            eventHandlers={{ click: () => onSelect(s.siteId) }}
+          >
+            <Tooltip>
+              <strong>{s.siteName}</strong>
+              <br />
+              {skinTempC !== null
+                ? `Skin temp: ${skinTempC.toFixed(1)} °C (ε=${eps.toFixed(2)})`
+                : "No data"}
+              {s.ta !== null && <><br />Air temp: {s.ta.toFixed(1)} °C</>}
+            </Tooltip>
+          </CircleMarker>
+        );
+      })}
     </MapContainer>
   );
 }
