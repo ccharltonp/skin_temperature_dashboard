@@ -1,0 +1,7 @@
+.next/
+node_modules/
+*.local
+.env
+.env.local
+.env.production.local
+data/estimates.json
