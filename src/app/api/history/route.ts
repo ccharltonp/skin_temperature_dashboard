@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
         ? computeSkinTemp(o.lwout, o.lwin)
         : null,
     ta: o.ta,
+    tsoil2: o.tsoil2,
     lwout: o.lwout,
     lwin: o.lwin,
   }));

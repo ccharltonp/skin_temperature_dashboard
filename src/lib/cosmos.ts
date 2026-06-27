@@ -13,7 +13,10 @@ export interface CosmosObservation {
   lwout: number | null;
   lwin: number | null;
   ta: number | null;
+  tsoil2: number | null; // 2 cm soil temperature from STP probe (stp_tsoil2)
 }
+
+const toCosmosISO = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
 // Fetch all site locations from the 30-minute collection
 export async function fetchSites(): Promise<CosmosLocation[]> {
@@ -32,40 +35,35 @@ export async function fetchSites(): Promise<CosmosLocation[]> {
   return features;
 }
 
-// Fetch the most recent 30-min observation for a site (lwout, lwin, ta)
+// Fetch the most recent 30-min observation for a site
 export async function fetchLatestObservation(
   siteId: string
 ): Promise<CosmosObservation> {
   // COSMOS data can lag by up to ~8 hours; look back 12 h to always get a value
   // API requires datetime without milliseconds: %Y-%m-%dT%H:%M:%SZ
-  const toCosmosISO = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
   const now = new Date();
   const lookback = new Date(now.getTime() - 12 * 60 * 60 * 1000);
   const dtParam = `${toCosmosISO(lookback)}/${toCosmosISO(now)}`;
 
   const url =
     `${BASE}/collections/30M/locations/${encodeURIComponent(siteId)}` +
-    `?parameter-name=lwout,lwin,ta&datetime=${dtParam}`;
+    `?parameter-name=lwout,lwin,ta,stp_tsoil2&datetime=${dtParam}`;
 
   const res = await fetch(url, { next: { revalidate: 0 } });
   if (!res.ok) {
-    return { siteId, timestamp: now.toISOString(), lwout: null, lwin: null, ta: null };
+    return { siteId, timestamp: now.toISOString(), lwout: null, lwin: null, ta: null, tsoil2: null };
   }
 
   const json = await res.json();
-  // Single-site responses are always wrapped in coverages array
   const coverage = json.coverages?.[0] ?? json;
 
-  const times: string[] =
-    coverage?.domain?.axes?.t?.values ?? [];
-  const lwoutVals: (number | null)[] =
-    coverage?.ranges?.lwout?.values ?? [];
-  const lwinVals: (number | null)[] =
-    coverage?.ranges?.lwin?.values ?? [];
-  const taVals: (number | null)[] =
-    coverage?.ranges?.ta?.values ?? [];
+  const times: string[]          = coverage?.domain?.axes?.t?.values ?? [];
+  const lwoutVals: (number|null)[] = coverage?.ranges?.lwout?.values ?? [];
+  const lwinVals:  (number|null)[] = coverage?.ranges?.lwin?.values ?? [];
+  const taVals:    (number|null)[] = coverage?.ranges?.ta?.values ?? [];
+  const tsoil2Vals:(number|null)[] = coverage?.ranges?.stp_tsoil2?.values ?? [];
 
-  // Find the most recent non-null pair
+  // Find the most recent timestep with valid lwout + lwin
   for (let i = times.length - 1; i >= 0; i--) {
     const lo = lwoutVals[i];
     const li = lwinVals[i];
@@ -76,6 +74,7 @@ export async function fetchLatestObservation(
         lwout: lo,
         lwin: li,
         ta: taVals[i] ?? null,
+        tsoil2: tsoil2Vals[i] ?? null,
       };
     }
   }
@@ -86,6 +85,7 @@ export async function fetchLatestObservation(
     lwout: null,
     lwin: null,
     ta: null,
+    tsoil2: null,
   };
 }
 
@@ -95,11 +95,10 @@ export async function fetchHistory(
   from: Date,
   to: Date
 ): Promise<CosmosObservation[]> {
-  const toCosmosISO = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
   const dtParam = `${toCosmosISO(from)}/${toCosmosISO(to)}`;
   const url =
     `${BASE}/collections/30M/locations/${encodeURIComponent(siteId)}` +
-    `?parameter-name=lwout,lwin,ta&datetime=${dtParam}`;
+    `?parameter-name=lwout,lwin,ta,stp_tsoil2&datetime=${dtParam}`;
 
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) return [];
@@ -107,10 +106,11 @@ export async function fetchHistory(
   const json = await res.json();
   const coverage = json.coverages?.[0] ?? json;
 
-  const times: string[] = coverage?.domain?.axes?.t?.values ?? [];
-  const lwoutVals: (number | null)[] = coverage?.ranges?.lwout?.values ?? [];
-  const lwinVals: (number | null)[] = coverage?.ranges?.lwin?.values ?? [];
-  const taVals: (number | null)[] = coverage?.ranges?.ta?.values ?? [];
+  const times: string[]          = coverage?.domain?.axes?.t?.values ?? [];
+  const lwoutVals: (number|null)[] = coverage?.ranges?.lwout?.values ?? [];
+  const lwinVals:  (number|null)[] = coverage?.ranges?.lwin?.values ?? [];
+  const taVals:    (number|null)[] = coverage?.ranges?.ta?.values ?? [];
+  const tsoil2Vals:(number|null)[] = coverage?.ranges?.stp_tsoil2?.values ?? [];
 
   return times.map((t, i) => ({
     siteId,
@@ -118,5 +118,6 @@ export async function fetchHistory(
     lwout: lwoutVals[i] ?? null,
     lwin: lwinVals[i] ?? null,
     ta: taVals[i] ?? null,
+    tsoil2: tsoil2Vals[i] ?? null,
   }));
 }

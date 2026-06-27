@@ -18,6 +18,7 @@ interface RawPoint {
   timestamp: string;
   skinTempC: number | null;
   ta: number | null;
+  tsoil2: number | null;
   lwout: number | null;
   lwin: number | null;
 }
@@ -127,6 +128,16 @@ export default function SiteChart({
             connectNulls={false}
             strokeWidth={1.5}
             strokeDasharray="4 2"
+          />
+          <Line
+            type="monotone"
+            dataKey="tsoil2"
+            name="Soil temp (2 cm)"
+            stroke="#a3e635"
+            dot={false}
+            connectNulls={false}
+            strokeWidth={1.5}
+            strokeDasharray="2 3"
           />
         </LineChart>
       </ResponsiveContainer>
