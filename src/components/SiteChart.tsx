@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { computeSkinTemp, DEFAULT_EMISSIVITY } from "@/lib/skinTemp";
@@ -19,6 +20,7 @@ interface RawPoint {
   skinTempC: number | null;
   ta: number | null;
   tsoil2: number | null;
+  vwc: number | null; // CRNS cosmos_vwc, daily, % — joined from 1D collection
   lwout: number | null;
   lwin: number | null;
 }
@@ -120,7 +122,7 @@ export default function SiteChart({
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={340}>
-          <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <LineChart data={data} margin={{ top: 4, right: 52, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
             <XAxis
               dataKey="timestamp"
@@ -129,18 +131,34 @@ export default function SiteChart({
               interval="preserveStartEnd"
               minTickGap={days <= 1 ? 30 : days <= 7 ? 60 : 80}
             />
+            {/* Left axis: temperature */}
             <YAxis
+              yAxisId="temp"
               unit="°C"
               tick={{ fontSize: 10, fill: "#94a3b8" }}
               width={45}
             />
+            {/* Right axis: soil moisture */}
+            <YAxis
+              yAxisId="vwc"
+              orientation="right"
+              unit="%"
+              domain={[0, 60]}
+              tick={{ fontSize: 10, fill: "#2dd4bf" }}
+              width={42}
+            />
             <Tooltip
               labelFormatter={tooltipFmt(days)}
-              formatter={(v: any) => (v != null ? `${Number(v).toFixed(1)} °C` : "—")}
+              formatter={(v: any, name: string) => {
+                if (v == null) return "—";
+                if (name === "VWC (CRNS)") return `${Number(v).toFixed(1)} %`;
+                return `${Number(v).toFixed(1)} °C`;
+              }}
               contentStyle={{ background: "#1e293b", border: "none", fontSize: 12 }}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Line
+              yAxisId="temp"
               type="monotone"
               dataKey="skinTempC"
               name="Skin temp"
@@ -150,6 +168,7 @@ export default function SiteChart({
               strokeWidth={1.5}
             />
             <Line
+              yAxisId="temp"
               type="monotone"
               dataKey="ta"
               name="Air temp"
@@ -160,6 +179,7 @@ export default function SiteChart({
               strokeDasharray="4 2"
             />
             <Line
+              yAxisId="temp"
               type="monotone"
               dataKey="tsoil2"
               name="Soil temp (2 cm)"
@@ -168,6 +188,17 @@ export default function SiteChart({
               connectNulls={false}
               strokeWidth={1.5}
               strokeDasharray="2 3"
+            />
+            <Line
+              yAxisId="vwc"
+              type="monotone"
+              dataKey="vwc"
+              name="VWC (CRNS)"
+              stroke="#2dd4bf"
+              dot={days >= 30 ? { r: 2, fill: "#2dd4bf" } : false}
+              connectNulls={false}
+              strokeWidth={2}
+              strokeDasharray="6 3"
             />
           </LineChart>
         </ResponsiveContainer>

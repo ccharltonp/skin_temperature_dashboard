@@ -20,6 +20,7 @@ export default function Dashboard() {
   // Emissivity state
   const [globalEmissivity, setGlobalEmissivity] = useState(DEFAULT_EMISSIVITY);
   const [siteEmissivity, setSiteEmissivity] = useState<Record<string, number>>({});
+  const [showTable, setShowTable] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -139,6 +140,17 @@ export default function Dashboard() {
               <Pill label="Max" value={`${max!.toFixed(1)} °C`} color="text-orange-400" />
             </div>
           )}
+          <button
+            onClick={() => setShowTable((v) => !v)}
+            className={`px-2 py-1 rounded text-sm transition-colors ${
+              showTable
+                ? "bg-blue-700 text-white"
+                : "bg-slate-700 hover:bg-slate-600 text-slate-200"
+            }`}
+            title="Toggle sites table"
+          >
+            {showTable ? "Hide table" : "Show table"}
+          </button>
           <a
             href="/api/export"
             className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-200 transition-colors"
@@ -213,8 +225,8 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Sites table — fixed height at bottom of right column */}
-          <div className="flex-shrink-0 max-h-52 overflow-y-auto border-t border-slate-700">
+          {/* Sites table — shown only when toggled on */}
+          <div className={`flex-shrink-0 max-h-52 overflow-y-auto border-t border-slate-700 transition-all ${showTable ? "" : "hidden"}`}>
             <table className="w-full text-xs text-slate-300">
               <thead className="bg-slate-800 sticky top-0">
                 <tr>

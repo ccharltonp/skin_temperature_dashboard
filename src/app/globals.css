@@ -1,6 +1,6 @@
+/* @import must come before all other rules */
+@import "leaflet/dist/leaflet.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Leaflet CSS — must be imported globally */
-@import "leaflet/dist/leaflet.css";
