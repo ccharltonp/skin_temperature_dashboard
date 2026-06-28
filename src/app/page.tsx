@@ -155,17 +155,18 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Body */}
+      {/* Body: map (fixed left) | panel (flex right) */}
       <div className="flex flex-1 min-h-0">
-        {/* Map */}
-        <div className="relative flex-1 min-w-0">
+
+        {/* Map — fixed narrow left column */}
+        <div className="relative w-[360px] flex-shrink-0 border-r border-slate-700">
           {loading && sites.length === 0 && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/70 text-slate-300">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/70 text-slate-300 text-sm">
               Fetching COSMOS-UK data…
             </div>
           )}
           {error && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-red-900 text-red-200 rounded px-3 py-2 text-sm">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-red-900 text-red-200 rounded px-3 py-2 text-xs">
               {error}
             </div>
           )}
@@ -175,115 +176,101 @@ export default function Dashboard() {
             onSelect={setSelected}
             effectiveEmissivity={effectiveEmissivity}
           />
-          <div className="absolute bottom-6 left-3 z-[1000]">
+          <div className="absolute bottom-4 left-2 z-[1000]">
             <Legend />
           </div>
         </div>
 
-        {/* Side panel */}
-        <div
-          className={`w-80 flex-shrink-0 overflow-y-auto bg-slate-900 border-l border-slate-700 transition-all duration-200 ${
-            selectedSite
-              ? "translate-x-0"
-              : "translate-x-full sm:translate-x-0 sm:w-0 sm:border-0"
-          }`}
-        >
-          {selectedSite ? (
-            <div className="p-3">
-              <SitePanel
-                site={selectedSite}
-                globalEmissivity={globalEmissivity}
-                siteEmissivity={siteEmissivity[selectedSite.siteId]}
-                onSiteEmissivityChange={(eps) =>
-                  setSiteEmissivity((prev) => {
-                    const next = { ...prev };
-                    if (eps === undefined) {
-                      delete next[selectedSite.siteId];
-                    } else {
-                      next[selectedSite.siteId] = eps;
-                    }
-                    return next;
-                  })
-                }
-                onClose={() => setSelected(null)}
-              />
-            </div>
-          ) : (
-            <div className="p-4 text-slate-500 text-sm">
-              Click a site on the map to see its skin temperature history and set a site-specific emissivity.
-            </div>
-          )}
-        </div>
-      </div>
+        {/* Right column: site panel (top) + sites table (bottom) */}
+        <div className="flex flex-col flex-1 min-w-0 min-h-0">
 
-      {/* Site table */}
-      <div className="hidden lg:block flex-shrink-0 max-h-48 overflow-y-auto border-t border-slate-700">
-        <table className="w-full text-xs text-slate-300">
-          <thead className="bg-slate-800 sticky top-0">
-            <tr>
-              {["Site", "ID", "ε", "Skin T (°C)", "Air T (°C)", "ΔT (°C)", "L↑ (W m⁻²)", "L↓ (W m⁻²)", "Timestamp"].map(
-                (h) => (
-                  <th key={h} className="px-3 py-2 text-left font-medium text-slate-400">
-                    {h}
-                  </th>
-                )
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {derivedSites
-              .slice()
-              .sort((a, b) => (b.skinTempC ?? -99) - (a.skinTempC ?? -99))
-              .map((s, i) => {
-                const hasOverride = siteEmissivity[s.siteId] !== undefined;
-                return (
-                  <tr
-                    key={s.siteId}
-                    className={`cursor-pointer hover:bg-slate-700/50 ${
-                      s.siteId === selected ? "bg-slate-700" : i % 2 === 0 ? "bg-slate-800/30" : ""
-                    }`}
-                    onClick={() => setSelected(s.siteId)}
-                  >
-                    <td className="px-3 py-1.5 font-medium text-white">{s.siteName}</td>
-                    <td className="px-3 py-1.5 text-slate-400">{s.siteId}</td>
-                    <td className="px-3 py-1.5 font-mono">
-                      <span className={hasOverride ? "text-orange-300" : "text-slate-400"}>
-                        {effectiveEmissivity(s.siteId).toFixed(2)}
-                      </span>
-                      {hasOverride && (
-                        <span className="ml-1 text-[9px] text-orange-500">●</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 text-orange-400 font-mono">
-                      {s.skinTempC != null ? s.skinTempC.toFixed(1) : "—"}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono">
-                      {s.ta != null ? s.ta.toFixed(1) : "—"}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono">
-                      {s.skinTempC != null && s.ta != null
-                        ? (s.skinTempC - s.ta).toFixed(1)
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono">
-                      {s.lwout != null ? s.lwout.toFixed(0) : "—"}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono">
-                      {s.lwin != null ? s.lwin.toFixed(0) : "—"}
-                    </td>
-                    <td className="px-3 py-1.5 text-slate-500">
-                      {s.timestamp
-                        ? new Date(s.timestamp).toLocaleTimeString("en-GB", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
+          {/* Site detail / chart — takes the majority of vertical space */}
+          <div className="flex-1 min-h-0 overflow-y-auto bg-slate-900">
+            {selectedSite ? (
+              <div className="p-4">
+                <SitePanel
+                  site={selectedSite}
+                  globalEmissivity={globalEmissivity}
+                  siteEmissivity={siteEmissivity[selectedSite.siteId]}
+                  onSiteEmissivityChange={(eps) =>
+                    setSiteEmissivity((prev) => {
+                      const next = { ...prev };
+                      if (eps === undefined) {
+                        delete next[selectedSite.siteId];
+                      } else {
+                        next[selectedSite.siteId] = eps;
+                      }
+                      return next;
+                    })
+                  }
+                  onClose={() => setSelected(null)}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+                Click a site on the map to see its skin temperature history.
+              </div>
+            )}
+          </div>
+
+          {/* Sites table — fixed height at bottom of right column */}
+          <div className="flex-shrink-0 max-h-52 overflow-y-auto border-t border-slate-700">
+            <table className="w-full text-xs text-slate-300">
+              <thead className="bg-slate-800 sticky top-0">
+                <tr>
+                  {["Site", "ID", "ε", "Skin T (°C)", "Air T (°C)", "ΔT (°C)", "L↑ (W m⁻²)", "L↓ (W m⁻²)", "Time"].map(
+                    (h) => (
+                      <th key={h} className="px-3 py-2 text-left font-medium text-slate-400 whitespace-nowrap">
+                        {h}
+                      </th>
+                    )
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {derivedSites
+                  .slice()
+                  .sort((a, b) => (b.skinTempC ?? -99) - (a.skinTempC ?? -99))
+                  .map((s, i) => {
+                    const hasOverride = siteEmissivity[s.siteId] !== undefined;
+                    return (
+                      <tr
+                        key={s.siteId}
+                        className={`cursor-pointer hover:bg-slate-700/50 ${
+                          s.siteId === selected ? "bg-slate-700" : i % 2 === 0 ? "bg-slate-800/30" : ""
+                        }`}
+                        onClick={() => setSelected(s.siteId)}
+                      >
+                        <td className="px-3 py-1.5 font-medium text-white whitespace-nowrap">{s.siteName}</td>
+                        <td className="px-3 py-1.5 text-slate-400">{s.siteId}</td>
+                        <td className="px-3 py-1.5 font-mono">
+                          <span className={hasOverride ? "text-orange-300" : "text-slate-400"}>
+                            {effectiveEmissivity(s.siteId).toFixed(2)}
+                          </span>
+                          {hasOverride && <span className="ml-1 text-[9px] text-orange-500">●</span>}
+                        </td>
+                        <td className="px-3 py-1.5 text-orange-400 font-mono">
+                          {s.skinTempC != null ? s.skinTempC.toFixed(1) : "—"}
+                        </td>
+                        <td className="px-3 py-1.5 font-mono">{s.ta != null ? s.ta.toFixed(1) : "—"}</td>
+                        <td className="px-3 py-1.5 font-mono">
+                          {s.skinTempC != null && s.ta != null ? (s.skinTempC - s.ta).toFixed(1) : "—"}
+                        </td>
+                        <td className="px-3 py-1.5 font-mono">{s.lwout != null ? s.lwout.toFixed(0) : "—"}</td>
+                        <td className="px-3 py-1.5 font-mono">{s.lwin != null ? s.lwin.toFixed(0) : "—"}</td>
+                        <td className="px-3 py-1.5 text-slate-500">
+                          {s.timestamp
+                            ? new Date(s.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+                            : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
       </div>
     </div>
   );

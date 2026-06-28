@@ -90,7 +90,7 @@ export default function SiteChart({
       <p className="text-sm text-slate-400 mb-2">
         Last {days} days — {siteName}
       </p>
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={340}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
           <XAxis
