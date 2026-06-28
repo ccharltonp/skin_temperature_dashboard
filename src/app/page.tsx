@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { SkinTempResult, computeSkinTemp, DEFAULT_EMISSIVITY } from "@/lib/skinTemp";
 import SitePanel from "@/components/SitePanel";
 import Legend from "@/components/Legend";
+import InfoModal from "@/components/InfoModal";
 
 const SiteMap = dynamic(() => import("@/components/SiteMap"), { ssr: false });
 
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const [globalEmissivity, setGlobalEmissivity] = useState(DEFAULT_EMISSIVITY);
   const [siteEmissivity, setSiteEmissivity] = useState<Record<string, number>>({});
   const [showTable, setShowTable] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -75,6 +77,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
+      {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
       {/* Header */}
       <header className="bg-slate-800 border-b border-slate-700 px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 flex-shrink-0">
         {/* Title */}
@@ -120,6 +123,14 @@ export default function Dashboard() {
               clear {overrideCount} override{overrideCount !== 1 ? "s" : ""}
             </button>
           )}
+          <button
+            onClick={() => setShowInfo(true)}
+            aria-label="About this dashboard"
+            title="About data sources &amp; method"
+            className="ml-1 w-5 h-5 flex items-center justify-center rounded-full border border-slate-500 text-slate-400 hover:text-white hover:border-white text-[11px] font-bold leading-none transition-colors"
+          >
+            i
+          </button>
         </div>
 
         {/* Stats */}
