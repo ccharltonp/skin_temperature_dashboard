@@ -43,8 +43,8 @@ function tempToColor(t: number | null): string {
 export default function SiteMap({ sites, selected, onSelect, effectiveEmissivity }: Props) {
   return (
     <MapContainer
-      center={[54.5, -3]}
-      zoom={6}
+      center={[54.5, -4.5]}
+      zoom={5}
       style={{ height: "100%", width: "100%" }}
       className="rounded-xl"
     >

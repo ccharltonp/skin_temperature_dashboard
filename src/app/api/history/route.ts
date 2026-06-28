@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const siteId = searchParams.get("site");
-  const days = Math.min(Number(searchParams.get("days") ?? "7"), 30);
+  const days = Math.min(Number(searchParams.get("days") ?? "7"), 182);
 
   if (!siteId) {
     return NextResponse.json({ error: "?site= required" }, { status: 400 });

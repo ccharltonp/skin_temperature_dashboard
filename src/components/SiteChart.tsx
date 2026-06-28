@@ -27,20 +27,44 @@ interface Props {
   siteId: string;
   siteName: string;
   emissivity?: number;
-  days?: number;
+}
+
+const PERIODS = [
+  { label: "Last 24 hours", days: 1 },
+  { label: "Last 7 days",   days: 7 },
+  { label: "Last month",    days: 30 },
+  { label: "Last 6 months", days: 182 },
+] as const;
+
+const DEFAULT_PERIOD = 7;
+
+// Tick format depends on the range: short ranges show time, long ranges show date only
+function tickFmt(days: number) {
+  if (days <= 1)  return (t: string) => format(parseISO(t), "HH:mm");
+  if (days <= 7)  return (t: string) => format(parseISO(t), "dd MMM HH:mm");
+  if (days <= 30) return (t: string) => format(parseISO(t), "dd MMM");
+  return          (t: string) => format(parseISO(t), "MMM yyyy");
+}
+
+function tooltipFmt(days: number) {
+  if (days <= 1)  return (t: string) => format(parseISO(t), "HH:mm dd MMM");
+  if (days <= 7)  return (t: string) => format(parseISO(t), "HH:mm dd MMM");
+  if (days <= 30) return (t: string) => format(parseISO(t), "dd MMM yyyy");
+  return          (t: string) => format(parseISO(t), "dd MMM yyyy");
 }
 
 export default function SiteChart({
   siteId,
   siteName,
   emissivity = DEFAULT_EMISSIVITY,
-  days = 7,
 }: Props) {
+  const [days, setDays] = useState<number>(DEFAULT_PERIOD);
   const [raw, setRaw] = useState<RawPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
+    setRaw([]);
     fetch(`/api/history?site=${siteId}&days=${days}`)
       .then((r) => r.json())
       .then((json) => {
@@ -63,84 +87,91 @@ export default function SiteChart({
     [raw, emissivity]
   );
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center h-48 text-slate-400">
-        Loading history…
-      </div>
-    );
-
-  if (raw.length === 0)
-    return (
-      <div className="flex items-center justify-center h-48 text-slate-400">
-        No data for {siteName}
-      </div>
-    );
-
-  const fmt = (t: string) => {
-    try {
-      return format(parseISO(t), "dd MMM HH:mm");
-    } catch {
-      return t;
-    }
-  };
+  const selectedPeriod = PERIODS.find((p) => p.days === days) ?? PERIODS[1];
 
   return (
-    <div>
-      <p className="text-sm text-slate-400 mb-2">
-        Last {days} days — {siteName}
-      </p>
-      <ResponsiveContainer width="100%" height={340}>
-        <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-          <XAxis
-            dataKey="timestamp"
-            tickFormatter={fmt}
-            tick={{ fontSize: 10, fill: "#94a3b8" }}
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            unit="°C"
-            tick={{ fontSize: 10, fill: "#94a3b8" }}
-            width={45}
-          />
-          <Tooltip
-            labelFormatter={fmt}
-            formatter={(v: any) => (v != null ? `${Number(v).toFixed(1)} °C` : "—")}
-            contentStyle={{ background: "#1e293b", border: "none", fontSize: 12 }}
-          />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Line
-            type="monotone"
-            dataKey="skinTempC"
-            name="Skin temp"
-            stroke="#f97316"
-            dot={false}
-            connectNulls={false}
-            strokeWidth={1.5}
-          />
-          <Line
-            type="monotone"
-            dataKey="ta"
-            name="Air temp"
-            stroke="#38bdf8"
-            dot={false}
-            connectNulls={false}
-            strokeWidth={1.5}
-            strokeDasharray="4 2"
-          />
-          <Line
-            type="monotone"
-            dataKey="tsoil2"
-            name="Soil temp (2 cm)"
-            stroke="#a3e635"
-            dot={false}
-            connectNulls={false}
-            strokeWidth={1.5}
-            strokeDasharray="2 3"
-          />
-        </LineChart>
-      </ResponsiveContainer>
+    <div className="flex flex-col gap-2">
+      {/* Period selector */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-400">
+          {selectedPeriod.label} — <span className="text-white">{siteName}</span>
+        </p>
+        <select
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          className="bg-slate-700 border border-slate-600 text-slate-200 text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          {PERIODS.map((p) => (
+            <option key={p.days} value={p.days}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Chart area */}
+      {loading ? (
+        <div className="flex items-center justify-center h-[340px] text-slate-400">
+          Loading {selectedPeriod.label.toLowerCase()}…
+        </div>
+      ) : raw.length === 0 ? (
+        <div className="flex items-center justify-center h-[340px] text-slate-400">
+          No data available for this period
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={340}>
+          <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={tickFmt(days)}
+              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              interval="preserveStartEnd"
+              minTickGap={days <= 1 ? 30 : days <= 7 ? 60 : 80}
+            />
+            <YAxis
+              unit="°C"
+              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              width={45}
+            />
+            <Tooltip
+              labelFormatter={tooltipFmt(days)}
+              formatter={(v: any) => (v != null ? `${Number(v).toFixed(1)} °C` : "—")}
+              contentStyle={{ background: "#1e293b", border: "none", fontSize: 12 }}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Line
+              type="monotone"
+              dataKey="skinTempC"
+              name="Skin temp"
+              stroke="#f97316"
+              dot={false}
+              connectNulls={false}
+              strokeWidth={1.5}
+            />
+            <Line
+              type="monotone"
+              dataKey="ta"
+              name="Air temp"
+              stroke="#38bdf8"
+              dot={false}
+              connectNulls={false}
+              strokeWidth={1.5}
+              strokeDasharray="4 2"
+            />
+            <Line
+              type="monotone"
+              dataKey="tsoil2"
+              name="Soil temp (2 cm)"
+              stroke="#a3e635"
+              dot={false}
+              connectNulls={false}
+              strokeWidth={1.5}
+              strokeDasharray="2 3"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }

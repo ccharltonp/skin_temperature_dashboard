@@ -124,7 +124,7 @@ export default function SitePanel({
         </p>
       </div>
 
-      <SiteChart siteId={site.siteId} siteName={site.siteName} emissivity={eps} days={7} />
+      <SiteChart siteId={site.siteId} siteName={site.siteName} emissivity={eps} />
     </div>
   );
 }
