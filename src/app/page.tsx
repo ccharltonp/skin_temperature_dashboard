@@ -18,7 +18,6 @@ export default function Dashboard() {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Emissivity state
   const [globalEmissivity, setGlobalEmissivity] = useState(DEFAULT_EMISSIVITY);
   const [siteEmissivity, setSiteEmissivity] = useState<Record<string, number>>({});
   const [showTable, setShowTable] = useState(false);
@@ -55,7 +54,6 @@ export default function Dashboard() {
 
   const selectedSite = sites.find((s) => s.siteId === selected) ?? null;
 
-  // Derive skin temps with current emissivity for header stats and table
   const derivedSites = sites.map((s) => {
     const eps = effectiveEmissivity(s.siteId);
     return {
@@ -73,124 +71,157 @@ export default function Dashboard() {
   const max = temps.length ? Math.max(...temps) : null;
   const min = temps.length ? Math.min(...temps) : null;
 
+  // Latest COSMOS observation timestamp across all sites
+  const latestDataAt = sites.length
+    ? sites.reduce<string | null>((best, s) => {
+        if (!s.timestamp) return best;
+        return !best || s.timestamp > best ? s.timestamp : best;
+      }, null)
+    : null;
+
   const overrideCount = Object.keys(siteEmissivity).length;
+
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
-      {/* Header */}
-      <header className="bg-slate-800 border-b border-slate-700 px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 flex-shrink-0">
-        {/* Title */}
-        <div className="mr-2">
-          <h1 className="text-sm font-bold text-white leading-tight">
-            COSMOS-UK Land Surface Skin Temperature
-          </h1>
-          <p className="text-[10px] text-slate-400">
-            Stefan-Boltzmann longwave inversion · 30-min data
-          </p>
-        </div>
 
-        {/* Global emissivity slider */}
-        <div className="flex items-center gap-2 bg-slate-700/60 rounded-lg px-3 py-1.5">
-          <span className="text-xs text-slate-300 whitespace-nowrap">
-            Global ε
-          </span>
-          <input
-            type="range"
-            min="0.01"
-            max="1.0"
-            step="0.01"
-            value={globalEmissivity}
-            onChange={(e) => setGlobalEmissivity(parseFloat(e.target.value))}
-            className="w-28 accent-blue-400"
-          />
-          <span className="text-sm font-mono text-blue-300 w-10">
-            {globalEmissivity.toFixed(2)}
-          </span>
-          <button
-            onClick={() => setGlobalEmissivity(DEFAULT_EMISSIVITY)}
-            className="text-[10px] text-slate-400 hover:text-white underline whitespace-nowrap"
-            title={`Reset to default (${DEFAULT_EMISSIVITY})`}
-          >
-            reset
-          </button>
-          {overrideCount > 0 && (
+      {/* ── Header ── */}
+      <header className="bg-slate-800 border-b border-slate-700 flex-shrink-0">
+
+        {/* Row 1: title + action buttons */}
+        <div className="px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <h1 className="text-sm font-bold text-white leading-tight">
+              COSMOS-UK Land Surface Skin Temperature
+            </h1>
+            <p className="text-[10px] text-slate-400 hidden sm:block">
+              Stefan-Boltzmann longwave inversion · 30-min data
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {mean !== null && (
+              <div className="hidden sm:flex gap-1.5">
+                <Pill label="Mean" value={`${mean.toFixed(1)} °C`} />
+                <Pill label="Min" value={`${min!.toFixed(1)} °C`} color="text-blue-400" />
+                <Pill label="Max" value={`${max!.toFixed(1)} °C`} color="text-orange-400" />
+              </div>
+            )}
             <button
-              onClick={() => setSiteEmissivity({})}
-              className="text-[10px] text-orange-400 hover:text-orange-200 underline whitespace-nowrap"
-              title="Clear all per-site overrides"
+              onClick={() => setShowTable((v) => !v)}
+              className={`px-2 py-1 rounded text-xs transition-colors ${
+                showTable
+                  ? "bg-blue-700 text-white"
+                  : "bg-slate-700 hover:bg-slate-600 text-slate-200"
+              }`}
             >
-              clear {overrideCount} override{overrideCount !== 1 ? "s" : ""}
+              {showTable ? "Hide table" : "Table"}
             </button>
-          )}
-          <button
-            onClick={() => setShowInfo(true)}
-            aria-label="About this dashboard"
-            title="About data sources &amp; method"
-            className="ml-1 w-5 h-5 flex items-center justify-center rounded-full border border-slate-500 text-slate-400 hover:text-white hover:border-white text-[11px] font-bold leading-none transition-colors"
-          >
-            i
-          </button>
+            <a
+              href="/api/export"
+              className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs text-slate-200 transition-colors whitespace-nowrap"
+            >
+              ↓ CSV
+            </a>
+            <button
+              onClick={load}
+              disabled={loading}
+              className="bg-blue-700 hover:bg-blue-600 disabled:opacity-50 px-2 py-1 rounded text-xs text-white transition-colors"
+            >
+              {loading ? "…" : "Refresh"}
+            </button>
+          </div>
         </div>
 
-        {/* Stats */}
-        <div className="flex items-center gap-2 text-xs text-slate-300 ml-auto">
-          {updatedAt && (
-            <span className="hidden sm:inline text-slate-500">
-              Updated{" "}
-              {new Date(updatedAt).toLocaleTimeString("en-GB", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+        {/* Row 2: emissivity + data timestamps */}
+        <div className="px-3 pb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          {/* Emissivity slider */}
+          <div className="flex items-center gap-2 bg-slate-700/60 rounded-lg px-3 py-1.5">
+            <span className="text-xs text-slate-300 whitespace-nowrap">Global ε</span>
+            <input
+              type="range"
+              min="0.01"
+              max="1.0"
+              step="0.01"
+              value={globalEmissivity}
+              onChange={(e) => setGlobalEmissivity(parseFloat(e.target.value))}
+              className="w-24 sm:w-28 accent-blue-400"
+            />
+            <span className="text-sm font-mono text-blue-300 w-10">
+              {globalEmissivity.toFixed(2)}
             </span>
-          )}
+            <button
+              onClick={() => setGlobalEmissivity(DEFAULT_EMISSIVITY)}
+              className="text-[10px] text-slate-400 hover:text-white underline whitespace-nowrap"
+              title={`Reset to default (${DEFAULT_EMISSIVITY})`}
+            >
+              reset
+            </button>
+            {overrideCount > 0 && (
+              <button
+                onClick={() => setSiteEmissivity({})}
+                className="text-[10px] text-orange-400 hover:text-orange-200 underline whitespace-nowrap"
+                title="Clear all per-site overrides"
+              >
+                clear {overrideCount} override{overrideCount !== 1 ? "s" : ""}
+              </button>
+            )}
+            <button
+              onClick={() => setShowInfo(true)}
+              aria-label="About this dashboard"
+              title="About data sources & method"
+              className="ml-1 w-5 h-5 flex items-center justify-center rounded-full border border-slate-500 text-slate-400 hover:text-white hover:border-white text-[11px] font-bold leading-none transition-colors"
+            >
+              i
+            </button>
+          </div>
+
+          {/* Data timestamps */}
+          <div className="flex flex-col text-[10px] text-slate-500 leading-tight">
+            {latestDataAt && (
+              <span>
+                <span className="text-slate-400">Data:</span> {fmt(latestDataAt)}{" "}
+                <span className="text-slate-600">(COSMOS lags ~8 h)</span>
+              </span>
+            )}
+            {updatedAt && (
+              <span>
+                <span className="text-slate-400">Fetched:</span> {fmt(updatedAt)}
+              </span>
+            )}
+          </div>
+
+          {/* Mobile-only stat pills */}
           {mean !== null && (
-            <div className="flex gap-2">
+            <div className="flex sm:hidden gap-1.5">
               <Pill label="Mean" value={`${mean.toFixed(1)} °C`} />
               <Pill label="Min" value={`${min!.toFixed(1)} °C`} color="text-blue-400" />
               <Pill label="Max" value={`${max!.toFixed(1)} °C`} color="text-orange-400" />
             </div>
           )}
-          <button
-            onClick={() => setShowTable((v) => !v)}
-            className={`px-2 py-1 rounded text-sm transition-colors ${
-              showTable
-                ? "bg-blue-700 text-white"
-                : "bg-slate-700 hover:bg-slate-600 text-slate-200"
-            }`}
-            title="Toggle sites table"
-          >
-            {showTable ? "Hide table" : "Show table"}
-          </button>
-          <a
-            href="/api/export"
-            className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-200 transition-colors"
-          >
-            ↓ CSV
-          </a>
-          <button
-            onClick={load}
-            disabled={loading}
-            className="bg-blue-700 hover:bg-blue-600 disabled:opacity-50 px-2 py-1 rounded text-white transition-colors"
-          >
-            {loading ? "…" : "Refresh"}
-          </button>
         </div>
+
+        {error && (
+          <div className="px-3 pb-2 text-xs text-red-400">{error}</div>
+        )}
       </header>
 
-      {/* Body: map (fixed left) | panel (flex right) */}
-      <div className="flex flex-1 min-h-0">
+      {/* ── Body ── stacks vertically on mobile, side-by-side on md+ */}
+      <div className="flex flex-col flex-1 min-h-0 md:flex-row overflow-hidden">
 
-        {/* Map — fixed narrow left column */}
-        <div className="relative w-[360px] flex-shrink-0 border-r border-slate-700">
+        {/* Map */}
+        <div className="relative w-full h-[42vh] md:w-[360px] md:h-auto flex-shrink-0 border-b border-slate-700 md:border-b-0 md:border-r">
           {loading && sites.length === 0 && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/70 text-slate-300 text-sm">
               Fetching COSMOS-UK data…
-            </div>
-          )}
-          {error && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-red-900 text-red-200 rounded px-3 py-2 text-xs">
-              {error}
             </div>
           )}
           <SiteMap
@@ -204,13 +235,13 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right column: site panel (top) + sites table (bottom) */}
-        <div className="flex flex-col flex-1 min-w-0 min-h-0">
+        {/* Right column */}
+        <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
 
-          {/* Site detail / chart — takes the majority of vertical space */}
+          {/* Site detail / chart */}
           <div className="flex-1 min-h-0 overflow-y-auto bg-slate-900">
             {selectedSite ? (
-              <div className="p-4">
+              <div className="p-3 sm:p-4">
                 <SitePanel
                   site={selectedSite}
                   globalEmissivity={globalEmissivity}
@@ -230,14 +261,14 @@ export default function Dashboard() {
                 />
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-sm">
-                Click a site on the map to see its skin temperature history.
+              <div className="flex items-center justify-center h-full text-slate-500 text-sm p-4 text-center">
+                Tap a site on the map to see its skin temperature history.
               </div>
             )}
           </div>
 
-          {/* Sites table — shown only when toggled on */}
-          <div className={`flex-shrink-0 max-h-52 overflow-y-auto border-t border-slate-700 transition-all ${showTable ? "" : "hidden"}`}>
+          {/* Sites table */}
+          <div className={`flex-shrink-0 max-h-52 overflow-auto border-t border-slate-700 ${showTable ? "" : "hidden"}`}>
             <table className="w-full text-xs text-slate-300">
               <thead className="bg-slate-800 sticky top-0">
                 <tr>
@@ -309,7 +340,7 @@ function Pill({
   color?: string;
 }) {
   return (
-    <span className="bg-slate-700 rounded px-2 py-0.5">
+    <span className="bg-slate-700 rounded px-2 py-0.5 text-xs">
       <span className="text-slate-400">{label} </span>
       <span className={`font-semibold ${color}`}>{value}</span>
     </span>
