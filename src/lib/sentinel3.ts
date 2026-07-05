@@ -35,7 +35,7 @@ export interface S3LSTObs {
 const EVALSCRIPT = `//VERSION=3
 function setup() {
   return {
-    input: [{ bands: ["LST", "LST_uncertainty", "dataMask"] }],
+    input: [{ bands: ["LST", "dataMask"] }],
     output: [
       { id: "lst", bands: 1, sampleType: "FLOAT32" },
       { id: "dataMask", bands: 1, sampleType: "UINT8" }
@@ -43,15 +43,11 @@ function setup() {
   };
 }
 function evaluatePixel(s) {
-  // Exclude cloud-contaminated pixels: dataMask=0 means no data;
-  // LST_uncertainty >= 2 K indicates a poor retrieval (cloud/mixed pixel).
-  // Also guard against unphysical UK values (below -15 C or above 55 C).
-  const valid = s.dataMask === 1
-    && s.LST_uncertainty > 0
-    && s.LST_uncertainty < 2.0
-    && s.LST > 258
-    && s.LST < 328;
-  return { lst: [valid ? s.LST : NaN], dataMask: [valid ? 1 : 0] };
+  // dataMask=0 means the SL_2_LST algorithm produced no valid retrieval
+  // (cloud-covered, sea, or snow). Apply a UK plausibility range as a
+  // secondary guard: −15 °C to 60 °C (258–333 K).
+  const valid = s.dataMask === 1 && s.LST > 258 && s.LST < 333;
+  return { lst: [s.LST], dataMask: [valid ? 1 : 0] };
 }`;
 
 export async function fetchS3LSTTimeseries(
@@ -62,8 +58,9 @@ export async function fetchS3LSTTimeseries(
 ): Promise<S3LSTObs[]> {
   const token = await getToken();
 
-  // ~1 km half-width (smaller than one SLSTR pixel → samples the single containing pixel)
-  const d = 0.005;
+  // ~1.5 km half-width — wide enough to guarantee the site falls inside at
+  // least one SLSTR pixel regardless of the pixel-grid phase offset
+  const d = 0.015;
   const bbox = [lon - d, lat - d, lon + d, lat + d];
 
   const body = {
@@ -85,7 +82,9 @@ export async function fetchS3LSTTimeseries(
     },
     calculations: {
       default: {
-        statistics: { default: { percentiles: { k: [50.0] } } },
+        // P90 selects the warm (clear-sky) end of the daily LST distribution.
+        // Cloud pixels are cold outliers so P50 would drag low on partly-cloudy days.
+        statistics: { default: { percentiles: { k: [90.0] } } },
       },
     },
   };
@@ -117,7 +116,7 @@ export async function fetchS3LSTTimeseries(
     const validCount = (stats.sampleCount ?? 0) - (stats.noDataCount ?? 0);
     if (validCount <= 0) continue;
 
-    const lstK = stats.percentiles?.["50.0"] ?? stats.mean;
+    const lstK = stats.percentiles?.["90.0"] ?? stats.mean;
     // Plausibility check: realistic UK land-surface range −15 °C to 55 °C
     if (!lstK || lstK < 258 || lstK > 328) continue;
 

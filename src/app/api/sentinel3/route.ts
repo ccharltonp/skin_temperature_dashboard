@@ -39,25 +39,26 @@ export async function GET(req: NextRequest) {
 
     // S3 returns one daily median LST per day (P1D aggregation).
     // Match each S3 day to the daily mean COSMOS skin temperature for the same UTC date.
-    const cosmosByDate = new Map<string, number[]>();
+    // S3 P90 represents the warm/clear-sky end of each day's overpasses.
+    // Match to the daily maximum COSMOS skin temperature so both sides
+    // represent peak daytime clear-sky conditions.
+    const cosmosByDate = new Map<string, number>();
     for (const o of cosmosObs) {
       if (o.lwout == null || o.lwin == null) continue;
       const skinC = computeSkinTemp(o.lwout, o.lwin, emissivity);
       if (skinC == null) continue;
-      const date = o.timestamp.slice(0, 10); // "YYYY-MM-DD"
-      const arr = cosmosByDate.get(date) ?? [];
-      arr.push(skinC);
-      cosmosByDate.set(date, arr);
+      const date = o.timestamp.slice(0, 10);
+      const prev = cosmosByDate.get(date);
+      if (prev === undefined || skinC > prev) cosmosByDate.set(date, skinC);
     }
 
     const pairs: ScatterPair[] = [];
 
     for (const s3 of s3Obs) {
       const date = s3.time.slice(0, 10);
-      const cosmosVals = cosmosByDate.get(date);
-      if (!cosmosVals || cosmosVals.length === 0) continue;
-      const dailyMean = cosmosVals.reduce((a, b) => a + b, 0) / cosmosVals.length;
-      pairs.push({ time: s3.time, s3lstC: s3.lstC, cosmosSkinC: +dailyMean.toFixed(2) });
+      const cosmosMax = cosmosByDate.get(date);
+      if (cosmosMax === undefined) continue;
+      pairs.push({ time: s3.time, s3lstC: s3.lstC, cosmosSkinC: +cosmosMax.toFixed(2) });
     }
 
     return NextResponse.json({ pairs });
