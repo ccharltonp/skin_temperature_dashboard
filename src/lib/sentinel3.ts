@@ -36,11 +36,14 @@ const EVALSCRIPT = `//VERSION=3
 function setup() {
   return {
     input: [{ bands: ["LST", "dataMask"] }],
-    output: [{ id: "lst", bands: 1, sampleType: "FLOAT32" }]
+    output: [
+      { id: "lst", bands: 1, sampleType: "FLOAT32" },
+      { id: "dataMask", bands: 1, sampleType: "UINT8" }
+    ]
   };
 }
 function evaluatePixel(s) {
-  return { lst: [s.dataMask ? s.LST : 0] };
+  return { lst: [s.LST], dataMask: [s.dataMask] };
 }`;
 
 export async function fetchS3LSTTimeseries(
