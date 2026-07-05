@@ -14,6 +14,7 @@ export interface CosmosObservation {
   lwin: number | null;
   ta: number | null;
   tsoil2: number | null; // 2 cm soil temperature from STP probe (stp_tsoil2)
+  tsoil5: number | null; // 5 cm soil temperature from STP probe (stp_tsoil5)
 }
 
 const toCosmosISO = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
@@ -47,7 +48,7 @@ export async function fetchLatestObservation(
 
   const url =
     `${BASE}/collections/30M/locations/${encodeURIComponent(siteId)}` +
-    `?parameter-name=lwout,lwin,ta,stp_tsoil2&datetime=${dtParam}`;
+    `?parameter-name=lwout,lwin,ta,stp_tsoil2,stp_tsoil5&datetime=${dtParam}`;
 
   const res = await fetch(url, { next: { revalidate: 0 } });
   if (!res.ok) {
@@ -62,6 +63,7 @@ export async function fetchLatestObservation(
   const lwinVals:  (number|null)[] = coverage?.ranges?.lwin?.values ?? [];
   const taVals:    (number|null)[] = coverage?.ranges?.ta?.values ?? [];
   const tsoil2Vals:(number|null)[] = coverage?.ranges?.stp_tsoil2?.values ?? [];
+  const tsoil5Vals:(number|null)[] = coverage?.ranges?.stp_tsoil5?.values ?? [];
 
   // Find the most recent timestep with valid lwout + lwin
   for (let i = times.length - 1; i >= 0; i--) {
@@ -75,6 +77,7 @@ export async function fetchLatestObservation(
         lwin: li,
         ta: taVals[i] ?? null,
         tsoil2: tsoil2Vals[i] ?? null,
+        tsoil5: tsoil5Vals[i] ?? null,
       };
     }
   }
@@ -86,6 +89,7 @@ export async function fetchLatestObservation(
     lwin: null,
     ta: null,
     tsoil2: null,
+    tsoil5: null,
   };
 }
 
@@ -123,7 +127,7 @@ export async function fetchHistory(
   const dtParam = `${toCosmosISO(from)}/${toCosmosISO(to)}`;
   const url =
     `${BASE}/collections/30M/locations/${encodeURIComponent(siteId)}` +
-    `?parameter-name=lwout,lwin,ta,stp_tsoil2&datetime=${dtParam}`;
+    `?parameter-name=lwout,lwin,ta,stp_tsoil2,stp_tsoil5&datetime=${dtParam}`;
 
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) return [];
@@ -136,6 +140,7 @@ export async function fetchHistory(
   const lwinVals:  (number|null)[] = coverage?.ranges?.lwin?.values ?? [];
   const taVals:    (number|null)[] = coverage?.ranges?.ta?.values ?? [];
   const tsoil2Vals:(number|null)[] = coverage?.ranges?.stp_tsoil2?.values ?? [];
+  const tsoil5Vals:(number|null)[] = coverage?.ranges?.stp_tsoil5?.values ?? [];
 
   return times.map((t, i) => ({
     siteId,
@@ -144,5 +149,6 @@ export async function fetchHistory(
     lwin: lwinVals[i] ?? null,
     ta: taVals[i] ?? null,
     tsoil2: tsoil2Vals[i] ?? null,
+    tsoil5: tsoil5Vals[i] ?? null,
   }));
 }

@@ -19,6 +19,7 @@ interface RawPoint {
   skinTempC: number | null;
   ta: number | null;
   tsoil2: number | null;
+  tsoil5: number | null;
   vwc: number | null;
   lwout: number | null;
   lwin: number | null;
@@ -185,6 +186,17 @@ export default function SiteChart({
               connectNulls={false}
               strokeWidth={1.5}
               strokeDasharray="2 3"
+            />
+            <Line
+              yAxisId="temp"
+              type="monotone"
+              dataKey="tsoil5"
+              name="Soil temp (5 cm)"
+              stroke="#b45309"
+              dot={false}
+              connectNulls={false}
+              strokeWidth={1.5}
+              strokeDasharray="5 2"
             />
             <Line
               yAxisId="vwc"

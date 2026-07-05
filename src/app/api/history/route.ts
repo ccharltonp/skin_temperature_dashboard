@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
         : null,
     ta: o.ta,
     tsoil2: o.tsoil2,
+    tsoil5: o.tsoil5,
     vwc: vwcByDate.get(o.timestamp.slice(0, 10)) ?? null,
     lwout: o.lwout,
     lwin: o.lwin,

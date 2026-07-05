@@ -63,6 +63,7 @@ export default function InfoModal({ onClose }: Props) {
                   <li><code className="bg-stone-100 px-1 rounded">lwin</code> — incoming (downwelling) longwave radiation, W m⁻²</li>
                   <li><code className="bg-stone-100 px-1 rounded">ta</code> — screen-level air temperature, °C</li>
                   <li><code className="bg-stone-100 px-1 rounded">stp_tsoil2</code> — STP probe soil temperature at 2 cm depth, °C</li>
+                  <li><code className="bg-stone-100 px-1 rounded">stp_tsoil5</code> — STP probe soil temperature at 5 cm depth, °C</li>
                 </ul>
               </li>
               <li>
