@@ -52,7 +52,7 @@ export async function fetchLatestObservation(
 
   const res = await fetch(url, { next: { revalidate: 0 } });
   if (!res.ok) {
-    return { siteId, timestamp: now.toISOString(), lwout: null, lwin: null, ta: null, tsoil2: null };
+    return { siteId, timestamp: now.toISOString(), lwout: null, lwin: null, ta: null, tsoil2: null, tsoil5: null };
   }
 
   const json = await res.json();
