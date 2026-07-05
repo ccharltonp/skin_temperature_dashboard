@@ -256,8 +256,8 @@ export default function ScatterPanel({ siteId, lat, lon, emissivity }: Props) {
           </ResponsiveContainer>
 
           <p className="text-[10px] text-stone-400 leading-relaxed">
-            Each point is a Sentinel-3 SLSTR SL_2_LST overpass matched to the nearest COSMOS 30-min
-            observation (±30 min). Dashed line = 1:1; blue line = linear fit.
+            Each point is a daily Sentinel-3 SLSTR SL_2_LST median matched to the daily mean
+            COSMOS-derived skin temperature for the same UTC date. Dashed line = 1:1; blue line = linear fit.
             Data via{" "}
             <a
               href="https://sh.dataspace.copernicus.eu"

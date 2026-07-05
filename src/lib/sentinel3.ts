@@ -68,7 +68,7 @@ export async function fetchS3LSTTimeseries(
     },
     aggregation: {
       timeRange: { from: fromISO, to: toISO },
-      aggregationInterval: { of: "PT30M" },
+      aggregationInterval: { of: "P1D" },
       resampling: "NEAREST",
       evalscript: EVALSCRIPT,
     },

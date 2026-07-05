@@ -37,34 +37,27 @@ export async function GET(req: NextRequest) {
       fetchHistory(site, from, to),
     ]);
 
-    // Build sorted COSMOS array with timestamps as ms for binary search
-    const cosmos = cosmosObs
-      .filter((o) => o.lwout != null && o.lwin != null)
-      .flatMap((o) => {
-        const skinC = computeSkinTemp(o.lwout!, o.lwin!, emissivity);
-        if (skinC == null) return [];
-        return [{ ms: new Date(o.timestamp).getTime(), skinC }];
-      })
-      .sort((a, b) => a.ms - b.ms);
-
-    const TOLERANCE_MS = 30 * 60 * 1000; // ±30 min
+    // S3 returns one daily median LST per day (P1D aggregation).
+    // Match each S3 day to the daily mean COSMOS skin temperature for the same UTC date.
+    const cosmosByDate = new Map<string, number[]>();
+    for (const o of cosmosObs) {
+      if (o.lwout == null || o.lwin == null) continue;
+      const skinC = computeSkinTemp(o.lwout, o.lwin, emissivity);
+      if (skinC == null) continue;
+      const date = o.timestamp.slice(0, 10); // "YYYY-MM-DD"
+      const arr = cosmosByDate.get(date) ?? [];
+      arr.push(skinC);
+      cosmosByDate.set(date, arr);
+    }
 
     const pairs: ScatterPair[] = [];
 
     for (const s3 of s3Obs) {
-      const t = new Date(s3.time).getTime();
-      // Binary search for nearest COSMOS obs
-      let lo = 0, hi = cosmos.length - 1, best = -1, bestDiff = Infinity;
-      while (lo <= hi) {
-        const mid = (lo + hi) >> 1;
-        const diff = Math.abs(cosmos[mid].ms - t);
-        if (diff < bestDiff) { bestDiff = diff; best = mid; }
-        if (cosmos[mid].ms < t) lo = mid + 1;
-        else hi = mid - 1;
-      }
-      if (best >= 0 && bestDiff <= TOLERANCE_MS) {
-        pairs.push({ time: s3.time, s3lstC: s3.lstC, cosmosSkinC: cosmos[best].skinC });
-      }
+      const date = s3.time.slice(0, 10);
+      const cosmosVals = cosmosByDate.get(date);
+      if (!cosmosVals || cosmosVals.length === 0) continue;
+      const dailyMean = cosmosVals.reduce((a, b) => a + b, 0) / cosmosVals.length;
+      pairs.push({ time: s3.time, s3lstC: s3.lstC, cosmosSkinC: +dailyMean.toFixed(2) });
     }
 
     return NextResponse.json({ pairs });
