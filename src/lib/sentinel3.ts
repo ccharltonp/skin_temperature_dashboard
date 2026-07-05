@@ -35,7 +35,7 @@ export interface S3LSTObs {
 const EVALSCRIPT = `//VERSION=3
 function setup() {
   return {
-    input: [{ bands: ["LST", "dataMask"] }],
+    input: [{ bands: ["LST", "LST_uncertainty", "dataMask"] }],
     output: [
       { id: "lst", bands: 1, sampleType: "FLOAT32" },
       { id: "dataMask", bands: 1, sampleType: "UINT8" }
@@ -43,7 +43,15 @@ function setup() {
   };
 }
 function evaluatePixel(s) {
-  return { lst: [s.LST], dataMask: [s.dataMask] };
+  // Exclude cloud-contaminated pixels: dataMask=0 means no data;
+  // LST_uncertainty >= 2 K indicates a poor retrieval (cloud/mixed pixel).
+  // Also guard against unphysical UK values (below -15 C or above 55 C).
+  const valid = s.dataMask === 1
+    && s.LST_uncertainty > 0
+    && s.LST_uncertainty < 2.0
+    && s.LST > 258
+    && s.LST < 328;
+  return { lst: [valid ? s.LST : NaN], dataMask: [valid ? 1 : 0] };
 }`;
 
 export async function fetchS3LSTTimeseries(
@@ -110,8 +118,8 @@ export async function fetchS3LSTTimeseries(
     if (validCount <= 0) continue;
 
     const lstK = stats.percentiles?.["50.0"] ?? stats.mean;
-    // Plausibility check: valid land-surface K values are 200–380
-    if (!lstK || lstK < 200 || lstK > 380) continue;
+    // Plausibility check: realistic UK land-surface range −15 °C to 55 °C
+    if (!lstK || lstK < 258 || lstK > 328) continue;
 
     // Midpoint of the 30-min window as the overpass representative time
     const t1 = new Date(interval.interval.from).getTime();
