@@ -104,11 +104,12 @@ export async function fetchS3LSTTimeseries(
     const band = interval.outputs?.lst?.bands?.B0;
     if (!band) continue;
 
-    // Skip intervals with no valid (unmasked) pixels
-    const validCount = band.sampleCount - band.noDataCount;
+    // Statistics API nests all stats under band.stats
+    const stats = band.stats ?? band;
+    const validCount = (stats.sampleCount ?? 0) - (stats.noDataCount ?? 0);
     if (validCount <= 0) continue;
 
-    const lstK = band.percentiles?.["50.0"] ?? band.mean;
+    const lstK = stats.percentiles?.["50.0"] ?? stats.mean;
     // Plausibility check: valid land-surface K values are 200–380
     if (!lstK || lstK < 200 || lstK > 380) continue;
 
