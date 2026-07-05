@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LineChart,
   Line,
@@ -40,6 +40,16 @@ const PERIODS = [
 
 const DEFAULT_PERIOD = 7;
 
+const SERIES = [
+  { key: "skinTempC",  label: "Skin temp",        color: "#ea580c" },
+  { key: "ta",         label: "Air temp",          color: "#0284c7" },
+  { key: "tsoil2",     label: "Soil temp (2 cm)",  color: "#65a30d" },
+  { key: "tsoil5",     label: "Soil temp (5 cm)",  color: "#b45309" },
+  { key: "vwc",        label: "VWC (CRNS)",        color: "#0d9488" },
+] as const;
+
+type SeriesKey = typeof SERIES[number]["key"];
+
 function tickFmt(days: number) {
   if (days <= 1)  return (t: string) => format(parseISO(t), "HH:mm");
   if (days <= 7)  return (t: string) => format(parseISO(t), "dd MMM HH:mm");
@@ -60,6 +70,22 @@ export default function SiteChart({
   const [days, setDays] = useState<number>(DEFAULT_PERIOD);
   const [raw, setRaw] = useState<RawPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visible, setVisible] = useState<Record<SeriesKey, boolean>>({
+    skinTempC: true, ta: true, tsoil2: true, tsoil5: true, vwc: true,
+  });
+  const [showSeriesPicker, setShowSeriesPicker] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Close picker when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowSeriesPicker(false);
+      }
+    };
+    if (showSeriesPicker) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showSeriesPicker]);
 
   useEffect(() => {
     setLoading(true);
@@ -89,21 +115,76 @@ export default function SiteChart({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <p className="text-sm text-stone-500">
           {selectedPeriod.label} — <span className="text-stone-800 font-medium">{siteName}</span>
         </p>
-        <select
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-          className="bg-white border border-stone-300 text-stone-700 text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          {PERIODS.map((p) => (
-            <option key={p.days} value={p.days}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          {/* Series picker */}
+          <div className="relative" ref={pickerRef}>
+            <button
+              onClick={() => setShowSeriesPicker((v) => !v)}
+              className="bg-white border border-stone-300 text-stone-700 text-xs rounded px-2 py-1 hover:bg-stone-50 flex items-center gap-1"
+            >
+              Series
+              <span className="text-stone-400 text-[10px]">
+                ({Object.values(visible).filter(Boolean).length}/{SERIES.length})
+              </span>
+              <span className="text-stone-400">▾</span>
+            </button>
+            {showSeriesPicker && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-stone-200 rounded-lg shadow-lg p-2 min-w-[170px]">
+                {SERIES.map((s) => (
+                  <label
+                    key={s.key}
+                    className="flex items-center gap-2 px-1 py-1 rounded hover:bg-stone-50 cursor-pointer text-xs text-stone-700 select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visible[s.key]}
+                      onChange={(e) =>
+                        setVisible((prev) => ({ ...prev, [s.key]: e.target.checked }))
+                      }
+                      className="rounded"
+                      style={{ accentColor: s.color }}
+                    />
+                    <span
+                      className="inline-block w-4 h-0.5 flex-shrink-0"
+                      style={{ background: s.color }}
+                    />
+                    {s.label}
+                  </label>
+                ))}
+                <div className="border-t border-stone-100 mt-1 pt-1 flex gap-2">
+                  <button
+                    onClick={() => setVisible({ skinTempC: true, ta: true, tsoil2: true, tsoil5: true, vwc: true })}
+                    className="text-[10px] text-blue-600 hover:underline"
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setVisible({ skinTempC: false, ta: false, tsoil2: false, tsoil5: false, vwc: false })}
+                    className="text-[10px] text-stone-400 hover:underline"
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Period selector */}
+          <select
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+            className="bg-white border border-stone-300 text-stone-700 text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            {PERIODS.map((p) => (
+              <option key={p.days} value={p.days}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -164,6 +245,7 @@ export default function SiteChart({
               dot={false}
               connectNulls={false}
               strokeWidth={1.5}
+              hide={!visible.skinTempC}
             />
             <Line
               yAxisId="temp"
@@ -175,6 +257,7 @@ export default function SiteChart({
               connectNulls={false}
               strokeWidth={1.5}
               strokeDasharray="4 2"
+              hide={!visible.ta}
             />
             <Line
               yAxisId="temp"
@@ -186,6 +269,7 @@ export default function SiteChart({
               connectNulls={false}
               strokeWidth={1.5}
               strokeDasharray="2 3"
+              hide={!visible.tsoil2}
             />
             <Line
               yAxisId="temp"
@@ -197,6 +281,7 @@ export default function SiteChart({
               connectNulls={false}
               strokeWidth={1.5}
               strokeDasharray="5 2"
+              hide={!visible.tsoil5}
             />
             <Line
               yAxisId="vwc"
@@ -208,6 +293,7 @@ export default function SiteChart({
               connectNulls={false}
               strokeWidth={2}
               strokeDasharray="6 3"
+              hide={!visible.vwc}
             />
           </LineChart>
         </ResponsiveContainer>
