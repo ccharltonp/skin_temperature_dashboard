@@ -10,7 +10,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceLine,
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { computeSkinTemp, DEFAULT_EMISSIVITY } from "@/lib/skinTemp";
@@ -20,7 +19,7 @@ interface RawPoint {
   skinTempC: number | null;
   ta: number | null;
   tsoil2: number | null;
-  vwc: number | null; // CRNS cosmos_vwc, daily, % — joined from 1D collection
+  vwc: number | null;
   lwout: number | null;
   lwin: number | null;
 }
@@ -40,7 +39,6 @@ const PERIODS = [
 
 const DEFAULT_PERIOD = 7;
 
-// Tick format depends on the range: short ranges show time, long ranges show date only
 function tickFmt(days: number) {
   if (days <= 1)  return (t: string) => format(parseISO(t), "HH:mm");
   if (days <= 7)  return (t: string) => format(parseISO(t), "dd MMM HH:mm");
@@ -49,9 +47,7 @@ function tickFmt(days: number) {
 }
 
 function tooltipFmt(days: number) {
-  if (days <= 1)  return (t: string) => format(parseISO(t), "HH:mm dd MMM");
   if (days <= 7)  return (t: string) => format(parseISO(t), "HH:mm dd MMM");
-  if (days <= 30) return (t: string) => format(parseISO(t), "dd MMM yyyy");
   return          (t: string) => format(parseISO(t), "dd MMM yyyy");
 }
 
@@ -76,7 +72,6 @@ export default function SiteChart({
       .catch(() => setLoading(false));
   }, [siteId, days]);
 
-  // Re-derive skin temp from raw radiation whenever emissivity changes
   const data = useMemo(
     () =>
       raw.map((p) => ({
@@ -93,15 +88,14 @@ export default function SiteChart({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Period selector */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-400">
-          {selectedPeriod.label} — <span className="text-white">{siteName}</span>
+        <p className="text-sm text-stone-500">
+          {selectedPeriod.label} — <span className="text-stone-800 font-medium">{siteName}</span>
         </p>
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="bg-slate-700 border border-slate-600 text-slate-200 text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="bg-white border border-stone-300 text-stone-700 text-xs rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           {PERIODS.map((p) => (
             <option key={p.days} value={p.days}>
@@ -111,40 +105,37 @@ export default function SiteChart({
         </select>
       </div>
 
-      {/* Chart area */}
       {loading ? (
-        <div className="flex items-center justify-center h-[340px] text-slate-400">
+        <div className="flex items-center justify-center h-[300px] text-stone-400">
           Loading {selectedPeriod.label.toLowerCase()}…
         </div>
       ) : raw.length === 0 ? (
-        <div className="flex items-center justify-center h-[340px] text-slate-400">
+        <div className="flex items-center justify-center h-[300px] text-stone-400">
           No data available for this period
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={340}>
+        <ResponsiveContainer width="100%" height={300}>
           <LineChart data={data} margin={{ top: 4, right: 52, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
             <XAxis
               dataKey="timestamp"
               tickFormatter={tickFmt(days)}
-              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              tick={{ fontSize: 10, fill: "#78716c" }}
               interval="preserveStartEnd"
               minTickGap={days <= 1 ? 30 : days <= 7 ? 60 : 80}
             />
-            {/* Left axis: temperature */}
             <YAxis
               yAxisId="temp"
               unit="°C"
-              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              tick={{ fontSize: 10, fill: "#78716c" }}
               width={45}
             />
-            {/* Right axis: soil moisture */}
             <YAxis
               yAxisId="vwc"
               orientation="right"
               unit="%"
               domain={[0, 60]}
-              tick={{ fontSize: 10, fill: "#2dd4bf" }}
+              tick={{ fontSize: 10, fill: "#0d9488" }}
               width={42}
             />
             <Tooltip
@@ -154,15 +145,21 @@ export default function SiteChart({
                 if (name === "VWC (CRNS)") return `${Number(v).toFixed(1)} %`;
                 return `${Number(v).toFixed(1)} °C`;
               }}
-              contentStyle={{ background: "#1e293b", border: "none", fontSize: 12 }}
+              contentStyle={{
+                background: "#fff",
+                border: "1px solid #e7e5e4",
+                borderRadius: "6px",
+                fontSize: 12,
+                color: "#1c1917",
+              }}
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend wrapperStyle={{ fontSize: 12, color: "#57534e" }} />
             <Line
               yAxisId="temp"
               type="monotone"
               dataKey="skinTempC"
               name="Skin temp"
-              stroke="#f97316"
+              stroke="#ea580c"
               dot={false}
               connectNulls={false}
               strokeWidth={1.5}
@@ -172,7 +169,7 @@ export default function SiteChart({
               type="monotone"
               dataKey="ta"
               name="Air temp"
-              stroke="#38bdf8"
+              stroke="#0284c7"
               dot={false}
               connectNulls={false}
               strokeWidth={1.5}
@@ -183,7 +180,7 @@ export default function SiteChart({
               type="monotone"
               dataKey="tsoil2"
               name="Soil temp (2 cm)"
-              stroke="#a3e635"
+              stroke="#65a30d"
               dot={false}
               connectNulls={false}
               strokeWidth={1.5}
@@ -194,8 +191,8 @@ export default function SiteChart({
               type="monotone"
               dataKey="vwc"
               name="VWC (CRNS)"
-              stroke="#2dd4bf"
-              dot={days >= 30 ? { r: 2, fill: "#2dd4bf" } : false}
+              stroke="#0d9488"
+              dot={days >= 30 ? { r: 2, fill: "#0d9488" } : false}
               connectNulls={false}
               strokeWidth={2}
               strokeDasharray="6 3"

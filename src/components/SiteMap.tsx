@@ -65,7 +65,7 @@ export default function SiteMap({ sites, selected, onSelect, effectiveEmissivity
             radius={selected === s.siteId ? 12 : 8}
             pathOptions={{
               fillColor: tempToColor(skinTempC),
-              color: selected === s.siteId ? "#fff" : "#0003",
+              color: selected === s.siteId ? "#1c1917" : "#0003",
               weight: selected === s.siteId ? 2 : 1,
               fillOpacity: 0.9,
             }}

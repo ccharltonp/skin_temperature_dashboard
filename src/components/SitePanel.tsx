@@ -33,16 +33,16 @@ export default function SitePanel({
     : "—";
 
   return (
-    <div className="bg-slate-800 rounded-xl p-4 flex flex-col gap-3">
+    <div className="bg-white border border-stone-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-white">{site.siteName}</h2>
-          <p className="text-xs text-slate-400">{site.siteId} · {ts}</p>
+          <h2 className="text-lg font-semibold text-stone-800">{site.siteName}</h2>
+          <p className="text-xs text-stone-500">{site.siteId} · {ts}</p>
         </div>
         <button
           onClick={onClose}
-          className="text-slate-400 hover:text-white text-xl leading-none"
+          className="text-stone-400 hover:text-stone-700 text-xl leading-none"
         >
           ×
         </button>
@@ -82,12 +82,12 @@ export default function SitePanel({
       </div>
 
       {/* Per-site emissivity */}
-      <div className="bg-slate-700/60 rounded-lg p-3 space-y-2">
+      <div className="bg-stone-100 rounded-lg p-3 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-slate-300">
+          <span className="text-xs font-medium text-stone-700">
             Site emissivity (ε)
             {hasOverride && (
-              <span className="ml-2 bg-orange-500/20 text-orange-300 text-[10px] px-1.5 py-0.5 rounded">
+              <span className="ml-2 bg-orange-100 text-orange-700 text-[10px] px-1.5 py-0.5 rounded border border-orange-200">
                 overridden
               </span>
             )}
@@ -95,7 +95,7 @@ export default function SitePanel({
           {hasOverride && (
             <button
               onClick={() => onSiteEmissivityChange(undefined)}
-              className="text-[10px] text-slate-400 hover:text-white underline"
+              className="text-[10px] text-stone-500 hover:text-stone-800 underline"
             >
               reset to global ({globalEmissivity.toFixed(2)})
             </button>
@@ -110,14 +110,14 @@ export default function SitePanel({
             step="0.01"
             value={eps}
             onChange={(e) => onSiteEmissivityChange(parseFloat(e.target.value))}
-            className="flex-1 accent-orange-400"
+            className="flex-1 accent-orange-500"
           />
-          <span className="text-sm font-mono text-orange-300 w-10 text-right">
+          <span className="text-sm font-mono text-orange-600 w-10 text-right">
             {eps.toFixed(2)}
           </span>
         </div>
 
-        <p className="text-[10px] text-slate-500">
+        <p className="text-[10px] text-stone-400">
           {hasOverride
             ? "This site uses its own ε — global slider won't affect it."
             : "Tracking global ε — drag to set a site-specific value."}
@@ -139,9 +139,9 @@ function Stat({
   highlight?: boolean;
 }) {
   return (
-    <div className="bg-slate-700/60 rounded-lg p-2">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className={`text-base font-semibold mt-0.5 ${highlight ? "text-orange-400" : "text-white"}`}>
+    <div className="bg-stone-100 rounded-lg p-2">
+      <p className="text-xs text-stone-500">{label}</p>
+      <p className={`text-base font-semibold mt-0.5 ${highlight ? "text-orange-600" : "text-stone-800"}`}>
         {value}
       </p>
     </div>

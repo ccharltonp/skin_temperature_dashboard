@@ -71,7 +71,6 @@ export default function Dashboard() {
   const max = temps.length ? Math.max(...temps) : null;
   const min = temps.length ? Math.min(...temps) : null;
 
-  // Latest COSMOS observation timestamp across all sites
   const latestDataAt = sites.length
     ? sites.reduce<string | null>((best, s) => {
         if (!s.timestamp) return best;
@@ -90,19 +89,19 @@ export default function Dashboard() {
     });
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden bg-stone-50">
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
 
       {/* ── Header ── */}
-      <header className="bg-slate-800 border-b border-slate-700 flex-shrink-0">
+      <header className="bg-white border-b border-stone-200 flex-shrink-0 shadow-sm">
 
         {/* Row 1: title + action buttons */}
         <div className="px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
           <div>
-            <h1 className="text-sm font-bold text-white leading-tight">
+            <h1 className="text-sm font-bold text-stone-800 leading-tight">
               COSMOS-UK Land Surface Skin Temperature
             </h1>
-            <p className="text-[10px] text-slate-400 hidden sm:block">
+            <p className="text-[10px] text-stone-500 hidden sm:block">
               Stefan-Boltzmann longwave inversion · 30-min data
             </p>
           </div>
@@ -111,41 +110,40 @@ export default function Dashboard() {
             {mean !== null && (
               <div className="hidden sm:flex gap-1.5">
                 <Pill label="Mean" value={`${mean.toFixed(1)} °C`} />
-                <Pill label="Min" value={`${min!.toFixed(1)} °C`} color="text-blue-400" />
-                <Pill label="Max" value={`${max!.toFixed(1)} °C`} color="text-orange-400" />
+                <Pill label="Min" value={`${min!.toFixed(1)} °C`} color="text-blue-600" />
+                <Pill label="Max" value={`${max!.toFixed(1)} °C`} color="text-orange-600" />
               </div>
             )}
             <button
               onClick={() => setShowTable((v) => !v)}
               className={`px-2 py-1 rounded text-xs transition-colors ${
                 showTable
-                  ? "bg-blue-700 text-white"
-                  : "bg-slate-700 hover:bg-slate-600 text-slate-200"
+                  ? "bg-blue-600 text-white"
+                  : "bg-stone-200 hover:bg-stone-300 text-stone-700"
               }`}
             >
               {showTable ? "Hide table" : "Table"}
             </button>
             <a
               href="/api/export"
-              className="bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-xs text-slate-200 transition-colors whitespace-nowrap"
+              className="bg-stone-200 hover:bg-stone-300 px-2 py-1 rounded text-xs text-stone-700 transition-colors whitespace-nowrap"
             >
               ↓ CSV
             </a>
             <button
               onClick={load}
               disabled={loading}
-              className="bg-blue-700 hover:bg-blue-600 disabled:opacity-50 px-2 py-1 rounded text-xs text-white transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-2 py-1 rounded text-xs text-white transition-colors"
             >
               {loading ? "…" : "Refresh"}
             </button>
           </div>
         </div>
 
-        {/* Row 2: emissivity + data timestamps */}
+        {/* Row 2: emissivity + timestamps */}
         <div className="px-3 pb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          {/* Emissivity slider */}
-          <div className="flex items-center gap-2 bg-slate-700/60 rounded-lg px-3 py-1.5">
-            <span className="text-xs text-slate-300 whitespace-nowrap">Global ε</span>
+          <div className="flex items-center gap-2 bg-stone-100 rounded-lg px-3 py-1.5">
+            <span className="text-xs text-stone-600 whitespace-nowrap">Global ε</span>
             <input
               type="range"
               min="0.01"
@@ -153,14 +151,14 @@ export default function Dashboard() {
               step="0.01"
               value={globalEmissivity}
               onChange={(e) => setGlobalEmissivity(parseFloat(e.target.value))}
-              className="w-24 sm:w-28 accent-blue-400"
+              className="w-24 sm:w-28 accent-blue-600"
             />
-            <span className="text-sm font-mono text-blue-300 w-10">
+            <span className="text-sm font-mono text-blue-600 w-10">
               {globalEmissivity.toFixed(2)}
             </span>
             <button
               onClick={() => setGlobalEmissivity(DEFAULT_EMISSIVITY)}
-              className="text-[10px] text-slate-400 hover:text-white underline whitespace-nowrap"
+              className="text-[10px] text-stone-500 hover:text-stone-800 underline whitespace-nowrap"
               title={`Reset to default (${DEFAULT_EMISSIVITY})`}
             >
               reset
@@ -168,7 +166,7 @@ export default function Dashboard() {
             {overrideCount > 0 && (
               <button
                 onClick={() => setSiteEmissivity({})}
-                className="text-[10px] text-orange-400 hover:text-orange-200 underline whitespace-nowrap"
+                className="text-[10px] text-orange-600 hover:text-orange-800 underline whitespace-nowrap"
                 title="Clear all per-site overrides"
               >
                 clear {overrideCount} override{overrideCount !== 1 ? "s" : ""}
@@ -178,49 +176,49 @@ export default function Dashboard() {
               onClick={() => setShowInfo(true)}
               aria-label="About this dashboard"
               title="About data sources & method"
-              className="ml-1 w-5 h-5 flex items-center justify-center rounded-full border border-slate-500 text-slate-400 hover:text-white hover:border-white text-[11px] font-bold leading-none transition-colors"
+              className="ml-1 w-5 h-5 flex items-center justify-center rounded-full border border-stone-400 text-stone-500 hover:text-stone-800 hover:border-stone-800 text-[11px] font-bold leading-none transition-colors"
             >
               i
             </button>
           </div>
 
-          {/* Data timestamps */}
-          <div className="flex flex-col text-[10px] text-slate-500 leading-tight">
+          <div className="flex flex-col text-[10px] text-stone-400 leading-tight">
             {latestDataAt && (
               <span>
-                <span className="text-slate-400">Data:</span> {fmt(latestDataAt)}{" "}
-                <span className="text-slate-600">(COSMOS lags ~8 h)</span>
+                <span className="text-stone-600">Data:</span> {fmt(latestDataAt)}{" "}
+                <span className="text-stone-300">(COSMOS lags ~8 h)</span>
               </span>
             )}
             {updatedAt && (
               <span>
-                <span className="text-slate-400">Fetched:</span> {fmt(updatedAt)}
+                <span className="text-stone-600">Fetched:</span> {fmt(updatedAt)}
               </span>
             )}
           </div>
 
-          {/* Mobile-only stat pills */}
           {mean !== null && (
             <div className="flex sm:hidden gap-1.5">
               <Pill label="Mean" value={`${mean.toFixed(1)} °C`} />
-              <Pill label="Min" value={`${min!.toFixed(1)} °C`} color="text-blue-400" />
-              <Pill label="Max" value={`${max!.toFixed(1)} °C`} color="text-orange-400" />
+              <Pill label="Min" value={`${min!.toFixed(1)} °C`} color="text-blue-600" />
+              <Pill label="Max" value={`${max!.toFixed(1)} °C`} color="text-orange-600" />
             </div>
           )}
         </div>
 
         {error && (
-          <div className="px-3 pb-2 text-xs text-red-400">{error}</div>
+          <div className="px-3 pb-2 text-xs text-red-600 bg-red-50 border-t border-red-200 py-1">
+            {error}
+          </div>
         )}
       </header>
 
-      {/* ── Body ── stacks vertically on mobile, side-by-side on md+ */}
+      {/* ── Body ── */}
       <div className="flex flex-col flex-1 min-h-0 md:flex-row overflow-hidden">
 
         {/* Map */}
-        <div className="relative w-full h-[42vh] md:w-[360px] md:h-auto flex-shrink-0 border-b border-slate-700 md:border-b-0 md:border-r">
+        <div className="relative w-full h-[42vh] md:w-[360px] md:h-auto flex-shrink-0 border-b border-stone-200 md:border-b-0 md:border-r">
           {loading && sites.length === 0 && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/70 text-slate-300 text-sm">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-stone-50/80 text-stone-500 text-sm">
               Fetching COSMOS-UK data…
             </div>
           )}
@@ -239,7 +237,7 @@ export default function Dashboard() {
         <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
 
           {/* Site detail / chart */}
-          <div className="flex-1 min-h-0 overflow-y-auto bg-slate-900">
+          <div className="flex-1 min-h-0 overflow-y-auto bg-stone-50">
             {selectedSite ? (
               <div className="p-3 sm:p-4">
                 <SitePanel
@@ -261,20 +259,20 @@ export default function Dashboard() {
                 />
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-sm p-4 text-center">
+              <div className="flex items-center justify-center h-full text-stone-400 text-sm p-4 text-center">
                 Tap a site on the map to see its skin temperature history.
               </div>
             )}
           </div>
 
           {/* Sites table */}
-          <div className={`flex-shrink-0 max-h-52 overflow-auto border-t border-slate-700 ${showTable ? "" : "hidden"}`}>
-            <table className="w-full text-xs text-slate-300">
-              <thead className="bg-slate-800 sticky top-0">
+          <div className={`flex-shrink-0 max-h-52 overflow-auto border-t border-stone-200 ${showTable ? "" : "hidden"}`}>
+            <table className="w-full text-xs text-stone-700">
+              <thead className="bg-stone-100 sticky top-0">
                 <tr>
                   {["Site", "ID", "ε", "Skin T (°C)", "Air T (°C)", "ΔT (°C)", "L↑ (W m⁻²)", "L↓ (W m⁻²)", "Time"].map(
                     (h) => (
-                      <th key={h} className="px-3 py-2 text-left font-medium text-slate-400 whitespace-nowrap">
+                      <th key={h} className="px-3 py-2 text-left font-medium text-stone-500 whitespace-nowrap">
                         {h}
                       </th>
                     )
@@ -290,20 +288,20 @@ export default function Dashboard() {
                     return (
                       <tr
                         key={s.siteId}
-                        className={`cursor-pointer hover:bg-slate-700/50 ${
-                          s.siteId === selected ? "bg-slate-700" : i % 2 === 0 ? "bg-slate-800/30" : ""
+                        className={`cursor-pointer hover:bg-stone-100 ${
+                          s.siteId === selected ? "bg-blue-50" : i % 2 === 0 ? "bg-white" : "bg-stone-50"
                         }`}
                         onClick={() => setSelected(s.siteId)}
                       >
-                        <td className="px-3 py-1.5 font-medium text-white whitespace-nowrap">{s.siteName}</td>
-                        <td className="px-3 py-1.5 text-slate-400">{s.siteId}</td>
+                        <td className="px-3 py-1.5 font-medium text-stone-800 whitespace-nowrap">{s.siteName}</td>
+                        <td className="px-3 py-1.5 text-stone-500">{s.siteId}</td>
                         <td className="px-3 py-1.5 font-mono">
-                          <span className={hasOverride ? "text-orange-300" : "text-slate-400"}>
+                          <span className={hasOverride ? "text-orange-600" : "text-stone-500"}>
                             {effectiveEmissivity(s.siteId).toFixed(2)}
                           </span>
                           {hasOverride && <span className="ml-1 text-[9px] text-orange-500">●</span>}
                         </td>
-                        <td className="px-3 py-1.5 text-orange-400 font-mono">
+                        <td className="px-3 py-1.5 text-orange-600 font-mono">
                           {s.skinTempC != null ? s.skinTempC.toFixed(1) : "—"}
                         </td>
                         <td className="px-3 py-1.5 font-mono">{s.ta != null ? s.ta.toFixed(1) : "—"}</td>
@@ -312,7 +310,7 @@ export default function Dashboard() {
                         </td>
                         <td className="px-3 py-1.5 font-mono">{s.lwout != null ? s.lwout.toFixed(0) : "—"}</td>
                         <td className="px-3 py-1.5 font-mono">{s.lwin != null ? s.lwin.toFixed(0) : "—"}</td>
-                        <td className="px-3 py-1.5 text-slate-500">
+                        <td className="px-3 py-1.5 text-stone-400">
                           {s.timestamp
                             ? new Date(s.timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
                             : "—"}
@@ -333,15 +331,15 @@ export default function Dashboard() {
 function Pill({
   label,
   value,
-  color = "text-white",
+  color = "text-stone-800",
 }: {
   label: string;
   value: string;
   color?: string;
 }) {
   return (
-    <span className="bg-slate-700 rounded px-2 py-0.5 text-xs">
-      <span className="text-slate-400">{label} </span>
+    <span className="bg-stone-100 border border-stone-200 rounded px-2 py-0.5 text-xs">
+      <span className="text-stone-500">{label} </span>
       <span className={`font-semibold ${color}`}>{value}</span>
     </span>
   );

@@ -12,8 +12,8 @@ export default function Legend() {
   ];
 
   return (
-    <div className="bg-slate-800/90 rounded-xl p-3 text-xs text-slate-300 space-y-1">
-      <p className="font-semibold text-white mb-2">Skin temperature</p>
+    <div className="bg-white/90 border border-stone-200 rounded-xl p-3 text-xs text-stone-600 space-y-1 shadow-sm">
+      <p className="font-semibold text-stone-800 mb-2">Skin temperature</p>
       {stops.map((s) => (
         <div key={s.label} className="flex items-center gap-2">
           <span
