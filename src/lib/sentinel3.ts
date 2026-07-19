@@ -113,12 +113,19 @@ export async function fetchS3LSTTimeseries(
 
     // Statistics API nests all stats under band.stats
     const stats = band.stats ?? band;
-    const validCount = (stats.sampleCount ?? 0) - (stats.noDataCount ?? 0);
-    if (validCount <= 0) continue;
+    const sampleCount = stats.sampleCount ?? 0;
+    const noDataCount = stats.noDataCount ?? 0;
+    const validCount = sampleCount - noDataCount;
+
+    // Require at least 50 % of pixels to be cloud-free.
+    // On a genuinely clear overpass the whole bbox is valid; only edge-of-cloud
+    // pixels or thin-cirrus cases pass dataMask with just 1–2 valid pixels, and
+    // those retrievals are unreliable.
+    if (validCount <= 0 || validCount / sampleCount < 0.5) continue;
 
     const lstK = stats.percentiles?.["90.0"] ?? stats.mean;
-    // Plausibility check: realistic UK land-surface range −15 °C to 55 °C
-    if (!lstK || lstK < 258 || lstK > 328) continue;
+    // Plausibility check: realistic UK land-surface range −10 °C to 55 °C
+    if (!lstK || lstK < 263 || lstK > 328) continue;
 
     // Midpoint of the 30-min window as the overpass representative time
     const t1 = new Date(interval.interval.from).getTime();
