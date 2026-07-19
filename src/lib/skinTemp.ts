@@ -21,7 +21,9 @@ export interface SkinTempResult {
   skinTempC: number | null;
   lwout: number | null;
   lwin: number | null;
-  ta: number | null;         // air temperature for reference
+  ta: number | null;
+  tsoil5: number | null;
+  vwc: number | null;
   error?: string;
 }
 

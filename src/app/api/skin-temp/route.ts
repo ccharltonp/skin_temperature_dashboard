@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchSites, fetchLatestObservation } from "@/lib/cosmos";
+import { fetchSites, fetchLatestObservation, fetchLatestVwc } from "@/lib/cosmos";
 import { computeSkinTemp, SkinTempResult } from "@/lib/skinTemp";
 import { appendEstimates } from "@/lib/store";
 
@@ -13,7 +13,10 @@ export async function GET() {
     const results: SkinTempResult[] = await Promise.all(
       sites.map(async (site) => {
         try {
-          const obs = await fetchLatestObservation(site.id);
+          const [obs, vwc] = await Promise.all([
+            fetchLatestObservation(site.id),
+            fetchLatestVwc(site.id),
+          ]);
           const skinTempC =
             obs.lwout != null && obs.lwin != null
               ? computeSkinTemp(obs.lwout, obs.lwin)
@@ -28,6 +31,8 @@ export async function GET() {
             lwout: obs.lwout,
             lwin: obs.lwin,
             ta: obs.ta,
+            tsoil5: obs.tsoil5,
+            vwc,
           };
         } catch (err) {
           return {
@@ -40,6 +45,8 @@ export async function GET() {
             lwout: null,
             lwin: null,
             ta: null,
+            tsoil5: null,
+            vwc: null,
             error: String(err),
           };
         }

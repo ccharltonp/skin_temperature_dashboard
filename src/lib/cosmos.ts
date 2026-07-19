@@ -93,6 +93,29 @@ export async function fetchLatestObservation(
   };
 }
 
+// Fetch the most recent daily cosmos_vwc for a single site (last 3 days)
+export async function fetchLatestVwc(siteId: string): Promise<number | null> {
+  const to = new Date();
+  const from = new Date(to.getTime() - 3 * 24 * 60 * 60 * 1000);
+  const dtParam = `${toCosmosISO(from)}/${toCosmosISO(to)}`;
+  const url =
+    `${BASE}/collections/1D/locations/${encodeURIComponent(siteId)}` +
+    `?parameter-name=cosmos_vwc&datetime=${dtParam}`;
+
+  const res = await fetch(url, { next: { revalidate: 3600 } });
+  if (!res.ok) return null;
+
+  const json = await res.json();
+  const coverage = json.coverages?.[0] ?? json;
+  const vwcVals: (number | null)[] = coverage?.ranges?.cosmos_vwc?.values ?? [];
+
+  // Return the most recent non-null value
+  for (let i = vwcVals.length - 1; i >= 0; i--) {
+    if (vwcVals[i] != null) return vwcVals[i];
+  }
+  return null;
+}
+
 // Fetch daily cosmos_vwc from the 1D collection (CRNS-derived soil moisture, %)
 export async function fetchVwcHistory(
   siteId: string,
