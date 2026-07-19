@@ -101,8 +101,9 @@ export default function Dashboard() {
             <h1 className="text-sm font-bold text-stone-800 leading-tight">
               COSMOS-UK Land Surface Skin Temperature
             </h1>
-            <p className="text-[10px] text-stone-500 hidden sm:block">
-              Stefan-Boltzmann longwave inversion · 30-min data
+            <p className="text-[10px] text-stone-500">
+              <span className="hidden sm:inline">Stefan-Boltzmann longwave inversion · 30-min data · </span>
+              developed by Dr. C. Charlton-Perez
             </p>
           </div>
 
