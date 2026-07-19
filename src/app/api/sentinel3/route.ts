@@ -37,19 +37,29 @@ export async function GET(req: NextRequest) {
       fetchHistory(site, from, to),
     ]);
 
-    // S3 returns one daily median LST per day (P1D aggregation).
-    // Match each S3 day to the daily mean COSMOS skin temperature for the same UTC date.
-    // S3 P90 represents the warm/clear-sky end of each day's overpasses.
-    // Match to the daily maximum COSMOS skin temperature so both sides
-    // represent peak daytime clear-sky conditions.
-    const cosmosByDate = new Map<string, number>();
+    // Build daily max COSMOS skin temp and daily mean air temp (ta) per date.
+    // ta is used as a quality gate for S3: cloud-top temperatures are always
+    // anomalously cold relative to screen-level air temperature, so any S3
+    // retrieval more than 10 °C colder than the daily mean ta is cloud-contaminated.
+    const cosmosByDate = new Map<string, number>();   // daily max skin temp
+    const cosmosTaByDate = new Map<string, number[]>(); // daily ta values for mean
+
     for (const o of cosmosObs) {
-      if (o.lwout == null || o.lwin == null) continue;
-      const skinC = computeSkinTemp(o.lwout, o.lwin, emissivity);
-      if (skinC == null) continue;
       const date = o.timestamp.slice(0, 10);
-      const prev = cosmosByDate.get(date);
-      if (prev === undefined || skinC > prev) cosmosByDate.set(date, skinC);
+
+      if (o.lwout != null && o.lwin != null) {
+        const skinC = computeSkinTemp(o.lwout, o.lwin, emissivity);
+        if (skinC != null) {
+          const prev = cosmosByDate.get(date);
+          if (prev === undefined || skinC > prev) cosmosByDate.set(date, skinC);
+        }
+      }
+
+      if (o.ta != null) {
+        const arr = cosmosTaByDate.get(date) ?? [];
+        arr.push(o.ta);
+        cosmosTaByDate.set(date, arr);
+      }
     }
 
     const pairs: ScatterPair[] = [];
@@ -58,6 +68,15 @@ export async function GET(req: NextRequest) {
       const date = s3.time.slice(0, 10);
       const cosmosMax = cosmosByDate.get(date);
       if (cosmosMax === undefined) continue;
+
+      // Air-temperature consistency check: reject S3 values that are more than
+      // 10 °C colder than the daily mean COSMOS air temperature.
+      const taVals = cosmosTaByDate.get(date);
+      if (taVals && taVals.length > 0) {
+        const meanTa = taVals.reduce((a, b) => a + b, 0) / taVals.length;
+        if (s3.lstC < meanTa - 10) continue;
+      }
+
       pairs.push({ time: s3.time, s3lstC: s3.lstC, cosmosSkinC: +cosmosMax.toFixed(2) });
     }
 
