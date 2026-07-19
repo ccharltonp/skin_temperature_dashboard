@@ -3,6 +3,7 @@
 import { SkinTempResult, computeSkinTemp, DEFAULT_EMISSIVITY } from "@/lib/skinTemp";
 import SiteChart from "./SiteChart";
 import ScatterPanel from "./ScatterPanel";
+import SiteInfoCard from "./SiteInfoCard";
 
 interface Props {
   site: SkinTempResult;
@@ -135,6 +136,13 @@ export default function SitePanel({
           emissivity={eps}
         />
       </div>
+
+      <SiteInfoCard
+        siteId={site.siteId}
+        siteName={site.siteName}
+        lat={site.latitude}
+        lon={site.longitude}
+      />
     </div>
   );
 }
