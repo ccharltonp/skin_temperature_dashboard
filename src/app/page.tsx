@@ -71,12 +71,6 @@ export default function Dashboard() {
   const max = temps.length ? Math.max(...temps) : null;
   const min = temps.length ? Math.min(...temps) : null;
 
-  // Top-3 warmest 5 cm soil temperatures
-  const top3Soil5 = [...sites]
-    .filter((s) => s.tsoil5 != null)
-    .sort((a, b) => b.tsoil5! - a.tsoil5!)
-    .slice(0, 3);
-
   const latestDataAt = sites.length
     ? sites.reduce<string | null>((best, s) => {
         if (!s.timestamp) return best;
@@ -218,41 +212,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Top-3 warmest 5 cm soil temperatures */}
-        {top3Soil5.length > 0 && (
-          <div className="border-t border-stone-200 bg-amber-50 px-3 py-2">
-            <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide mb-1.5">
-              Warmest 5 cm soil temperatures
-            </p>
-            <div className="flex gap-2 overflow-x-auto pb-0.5">
-              {top3Soil5.map((s, i) => (
-                <button
-                  key={s.siteId}
-                  onClick={() => setSelected(s.siteId)}
-                  className="flex-shrink-0 bg-white border border-amber-200 rounded-lg px-3 py-2 text-left hover:border-amber-400 hover:shadow-sm transition-all min-w-[170px]"
-                >
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[10px] font-bold text-amber-600 bg-amber-100 rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
-                      {i + 1}
-                    </span>
-                    <span className="text-xs font-semibold text-stone-800 truncate">{s.siteName}</span>
-                  </div>
-                  <p className="text-lg font-bold text-amber-700 leading-none mb-1">
-                    {s.tsoil5!.toFixed(1)} °C
-                  </p>
-                  <div className="text-[10px] text-stone-500 space-y-0.5">
-                    <p>{fmt(s.timestamp)}</p>
-                    <p>
-                      Air: {s.ta != null ? `${s.ta.toFixed(1)} °C` : "—"}
-                      {" · "}
-                      VWC: {s.vwc != null ? `${s.vwc.toFixed(1)} %` : "—"}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+
       </header>
 
       {/* ── Body ── */}

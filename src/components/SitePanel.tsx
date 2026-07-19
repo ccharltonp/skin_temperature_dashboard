@@ -4,6 +4,7 @@ import { SkinTempResult, computeSkinTemp, DEFAULT_EMISSIVITY } from "@/lib/skinT
 import SiteChart from "./SiteChart";
 import ScatterPanel from "./ScatterPanel";
 import SiteInfoCard from "./SiteInfoCard";
+import TopSoilTemps from "./TopSoilTemps";
 
 interface Props {
   site: SkinTempResult;
@@ -82,6 +83,8 @@ export default function SitePanel({
           value={`${site.latitude.toFixed(3)}, ${site.longitude.toFixed(3)}`}
         />
       </div>
+
+      <TopSoilTemps siteId={site.siteId} />
 
       {/* Per-site emissivity */}
       <div className="bg-stone-100 rounded-lg p-3 space-y-2">
