@@ -37,47 +37,62 @@ export async function GET(req: NextRequest) {
       fetchHistory(site, from, to),
     ]);
 
-    // Build daily max COSMOS skin temp and daily mean air temp (ta) per date.
-    // ta is used as a quality gate for S3: cloud-top temperatures are always
-    // anomalously cold relative to screen-level air temperature, so any S3
-    // retrieval more than 10 °C colder than the daily mean ta is cloud-contaminated.
-    const cosmosByDate = new Map<string, number>();   // daily max skin temp
-    const cosmosTaByDate = new Map<string, number[]>(); // daily ta values for mean
+    // Build per-date COSMOS observations (skin temp + ta) for nearest-in-time lookup.
+    // Sentinel-3 SLSTR passes over the UK at approximately 10:00 UTC (daytime ascending
+    // node). We match each S3 daily value to the COSMOS 30-min observation whose
+    // timestamp is closest to 10:00 UTC on that day.
+    const S3_OVERPASS_HOUR = 10; // UTC
+
+    interface CosmosEntry { ms: number; skinC: number; ta: number | null }
+    const cosmosByDate = new Map<string, CosmosEntry[]>();
+    const cosmosTaByDate = new Map<string, number[]>();
 
     for (const o of cosmosObs) {
       const date = o.timestamp.slice(0, 10);
-
-      if (o.lwout != null && o.lwin != null) {
-        const skinC = computeSkinTemp(o.lwout, o.lwin, emissivity);
-        if (skinC != null) {
-          const prev = cosmosByDate.get(date);
-          if (prev === undefined || skinC > prev) cosmosByDate.set(date, skinC);
-        }
-      }
 
       if (o.ta != null) {
         const arr = cosmosTaByDate.get(date) ?? [];
         arr.push(o.ta);
         cosmosTaByDate.set(date, arr);
       }
+
+      if (o.lwout == null || o.lwin == null) continue;
+      const skinC = computeSkinTemp(o.lwout, o.lwin, emissivity);
+      if (skinC == null) continue;
+
+      const arr = cosmosByDate.get(date) ?? [];
+      arr.push({ ms: new Date(o.timestamp).getTime(), skinC, ta: o.ta });
+      cosmosByDate.set(date, arr);
     }
 
     const pairs: ScatterPair[] = [];
 
     for (const s3 of s3Obs) {
       const date = s3.time.slice(0, 10);
-      const cosmosMax = cosmosByDate.get(date);
-      if (cosmosMax === undefined) continue;
 
-      // Air-temperature consistency check: reject S3 values that are more than
-      // 10 °C colder than the daily mean COSMOS air temperature.
+      // Air-temperature consistency check: reject S3 values more than 10 °C colder
+      // than the daily mean COSMOS air temperature (indicates cloud contamination).
       const taVals = cosmosTaByDate.get(date);
       if (taVals && taVals.length > 0) {
         const meanTa = taVals.reduce((a, b) => a + b, 0) / taVals.length;
         if (s3.lstC < meanTa - 10) continue;
       }
 
-      pairs.push({ time: s3.time, s3lstC: s3.lstC, cosmosSkinC: +cosmosMax.toFixed(2) });
+      const dayObs = cosmosByDate.get(date);
+      if (!dayObs || dayObs.length === 0) continue;
+
+      // Target: 10:00 UTC on the S3 date (approximate daytime overpass time)
+      const targetMs = new Date(`${date}T${String(S3_OVERPASS_HOUR).padStart(2, "0")}:00:00Z`).getTime();
+
+      // Find the COSMOS obs closest in time to the target
+      let best = dayObs[0];
+      let bestDiff = Math.abs(dayObs[0].ms - targetMs);
+      for (const c of dayObs) {
+        const d = Math.abs(c.ms - targetMs);
+        if (d < bestDiff) { bestDiff = d; best = c; }
+      }
+
+      pairs.push({ time: s3.time, s3lstC: s3.lstC, cosmosSkinC: +best.skinC.toFixed(2) });
     }
 
     return NextResponse.json({ pairs });
