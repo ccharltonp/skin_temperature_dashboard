@@ -257,8 +257,8 @@ export default function ScatterPanel({ siteId, lat, lon, emissivity }: Props) {
 
           <p className="text-[10px] text-stone-400 leading-relaxed">
             Each point is the daily 90th-percentile Sentinel-3 SLSTR SL_2_LST (clear-sky warm-end
-            estimate) matched to the daily maximum COSMOS-derived skin temperature for the same
-            UTC date. Cloud-covered pixels are excluded via the product dataMask.
+            estimate) matched to the COSMOS-derived skin temperature for the same
+            date and closest time to the overpass. Cloud-covered pixels are excluded via the product dataMask.
             Dashed line = 1:1; blue line = linear fit. Data via{" "}
             <a
               href="https://sh.dataspace.copernicus.eu"
