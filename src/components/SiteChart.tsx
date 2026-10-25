@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import { format, parseISO } from "date-fns";
@@ -101,13 +102,15 @@ export default function SiteChart({
 
   const data = useMemo(
     () =>
-      raw.map((p) => ({
-        ...p,
-        skinTempC:
+      raw.map((p) => {
+        const skinTempC =
           p.lwout != null && p.lwin != null
             ? computeSkinTemp(p.lwout, p.lwin, emissivity)
-            : null,
-      })),
+            : null;
+        const deltaT =
+          skinTempC != null && p.ta != null ? +(skinTempC - p.ta).toFixed(2) : null;
+        return { ...p, skinTempC, deltaT };
+      }),
     [raw, emissivity]
   );
 
@@ -196,107 +199,159 @@ export default function SiteChart({
           No data available for this period
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={data} margin={{ top: 4, right: 52, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
-            <XAxis
-              dataKey="timestamp"
-              tickFormatter={tickFmt(days)}
-              tick={{ fontSize: 10, fill: "#78716c" }}
-              interval="preserveStartEnd"
-              minTickGap={days <= 1 ? 30 : days <= 7 ? 60 : 80}
-            />
-            <YAxis
-              yAxisId="temp"
-              unit="°C"
-              tick={{ fontSize: 10, fill: "#78716c" }}
-              width={45}
-            />
-            <YAxis
-              yAxisId="vwc"
-              orientation="right"
-              unit="%"
-              domain={[0, 60]}
-              tick={{ fontSize: 10, fill: "#0d9488" }}
-              width={42}
-            />
-            <Tooltip
-              labelFormatter={tooltipFmt(days)}
-              formatter={(v: any, name: string) => {
-                if (v == null) return "—";
-                if (name === "VWC (CRNS)") return `${Number(v).toFixed(1)} %`;
-                return `${Number(v).toFixed(1)} °C`;
-              }}
-              contentStyle={{
-                background: "#fff",
-                border: "1px solid #e7e5e4",
-                borderRadius: "6px",
-                fontSize: 12,
-                color: "#1c1917",
-              }}
-            />
-            <Legend wrapperStyle={{ fontSize: 12, color: "#57534e" }} />
-            <Line
-              yAxisId="temp"
-              type="monotone"
-              dataKey="skinTempC"
-              name="Skin temp"
-              stroke="#ea580c"
-              dot={false}
-              connectNulls={false}
-              strokeWidth={1.5}
-              hide={!visible.skinTempC}
-            />
-            <Line
-              yAxisId="temp"
-              type="monotone"
-              dataKey="ta"
-              name="Air temp"
-              stroke="#0284c7"
-              dot={false}
-              connectNulls={false}
-              strokeWidth={1.5}
-              strokeDasharray="4 2"
-              hide={!visible.ta}
-            />
-            <Line
-              yAxisId="temp"
-              type="monotone"
-              dataKey="tsoil2"
-              name="Soil temp (2 cm)"
-              stroke="#65a30d"
-              dot={false}
-              connectNulls={false}
-              strokeWidth={1.5}
-              strokeDasharray="2 3"
-              hide={!visible.tsoil2}
-            />
-            <Line
-              yAxisId="temp"
-              type="monotone"
-              dataKey="tsoil5"
-              name="Soil temp (5 cm)"
-              stroke="#b45309"
-              dot={false}
-              connectNulls={false}
-              strokeWidth={1.5}
-              strokeDasharray="5 2"
-              hide={!visible.tsoil5}
-            />
-            <Line
-              yAxisId="vwc"
-              type="monotone"
-              dataKey="vwc"
-              name="VWC (CRNS)"
-              stroke="#0d9488"
-              dot={days >= 30 ? { r: 2, fill: "#0d9488" } : false}
-              connectNulls={false}
-              strokeWidth={2}
-              strokeDasharray="6 3"
-              hide={!visible.vwc}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={data} margin={{ top: 4, right: 52, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
+              <XAxis
+                dataKey="timestamp"
+                tickFormatter={tickFmt(days)}
+                tick={{ fontSize: 10, fill: "#78716c" }}
+                interval="preserveStartEnd"
+                minTickGap={days <= 1 ? 30 : days <= 7 ? 60 : 80}
+              />
+              <YAxis
+                yAxisId="temp"
+                unit="°C"
+                tick={{ fontSize: 10, fill: "#78716c" }}
+                width={45}
+              />
+              <YAxis
+                yAxisId="vwc"
+                orientation="right"
+                unit="%"
+                domain={[0, 60]}
+                tick={{ fontSize: 10, fill: "#0d9488" }}
+                width={42}
+              />
+              <Tooltip
+                labelFormatter={tooltipFmt(days)}
+                formatter={(v: any, name: string) => {
+                  if (v == null) return "—";
+                  if (name === "VWC (CRNS)") return `${Number(v).toFixed(1)} %`;
+                  return `${Number(v).toFixed(1)} °C`;
+                }}
+                contentStyle={{
+                  background: "#fff",
+                  border: "1px solid #e7e5e4",
+                  borderRadius: "6px",
+                  fontSize: 12,
+                  color: "#1c1917",
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, color: "#57534e" }} />
+              <Line
+                yAxisId="temp"
+                type="monotone"
+                dataKey="skinTempC"
+                name="Skin temp"
+                stroke="#ea580c"
+                dot={false}
+                connectNulls={false}
+                strokeWidth={1.5}
+                hide={!visible.skinTempC}
+              />
+              <Line
+                yAxisId="temp"
+                type="monotone"
+                dataKey="ta"
+                name="Air temp"
+                stroke="#0284c7"
+                dot={false}
+                connectNulls={false}
+                strokeWidth={1.5}
+                strokeDasharray="4 2"
+                hide={!visible.ta}
+              />
+              <Line
+                yAxisId="temp"
+                type="monotone"
+                dataKey="tsoil2"
+                name="Soil temp (2 cm)"
+                stroke="#65a30d"
+                dot={false}
+                connectNulls={false}
+                strokeWidth={1.5}
+                strokeDasharray="2 3"
+                hide={!visible.tsoil2}
+              />
+              <Line
+                yAxisId="temp"
+                type="monotone"
+                dataKey="tsoil5"
+                name="Soil temp (5 cm)"
+                stroke="#b45309"
+                dot={false}
+                connectNulls={false}
+                strokeWidth={1.5}
+                strokeDasharray="5 2"
+                hide={!visible.tsoil5}
+              />
+              <Line
+                yAxisId="vwc"
+                type="monotone"
+                dataKey="vwc"
+                name="VWC (CRNS)"
+                stroke="#0d9488"
+                dot={days >= 30 ? { r: 2, fill: "#0d9488" } : false}
+                connectNulls={false}
+                strokeWidth={2}
+                strokeDasharray="6 3"
+                hide={!visible.vwc}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+
+          {/* ΔT chart */}
+          <div className="mt-2">
+            <p className="text-xs text-stone-500 mb-1">
+              Skin − air temperature difference (ΔT)
+            </p>
+            <ResponsiveContainer width="100%" height={160}>
+              <LineChart data={data} margin={{ top: 4, right: 52, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
+                <XAxis
+                  dataKey="timestamp"
+                  tickFormatter={tickFmt(days)}
+                  tick={{ fontSize: 10, fill: "#78716c" }}
+                  interval="preserveStartEnd"
+                  minTickGap={days <= 1 ? 30 : days <= 7 ? 60 : 80}
+                />
+                <YAxis
+                  unit="°C"
+                  tick={{ fontSize: 10, fill: "#78716c" }}
+                  width={45}
+                />
+                <YAxis yAxisId="right" orientation="right" width={42} tick={false} />
+                <Tooltip
+                  labelFormatter={tooltipFmt(days)}
+                  formatter={(v: any) => {
+                    if (v == null) return "—";
+                    return [`${Number(v).toFixed(1)} °C`, "ΔT (skin − air)"];
+                  }}
+                  contentStyle={{
+                    background: "#fff",
+                    border: "1px solid #e7e5e4",
+                    borderRadius: "6px",
+                    fontSize: 12,
+                    color: "#1c1917",
+                  }}
+                />
+                {/* Zero reference line */}
+                <ReferenceLine y={0} stroke="#a8a29e" strokeDasharray="4 2" strokeWidth={1} />
+                <Line
+                  type="monotone"
+                  dataKey="deltaT"
+                  name="ΔT (skin − air)"
+                  stroke="#7c3aed"
+                  dot={false}
+                  connectNulls={false}
+                  strokeWidth={1.5}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
       )}
     </div>
   );
