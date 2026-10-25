@@ -29,7 +29,48 @@ interface RawPoint {
 interface Props {
   siteId: string;
   siteName: string;
+  lat: number;
+  lon: number;
   emissivity?: number;
+}
+
+// NOAA simplified solar position — returns sunrise/sunset as Unix ms (UTC), or null (polar day/night)
+function getSunTimes(
+  dateUTC: Date,
+  lat: number,
+  lon: number
+): { sunrise: number; sunset: number } | null {
+  const JD = dateUTC.getTime() / 86400000 + 2440587.5;
+  const n = Math.round(JD - 2451545.0);
+  const Jstar = n - lon / 360;
+  const M = ((357.5291 + 0.98560028 * Jstar) % 360 + 360) % 360;
+  const Mrad = (M * Math.PI) / 180;
+  const C =
+    1.9148 * Math.sin(Mrad) +
+    0.02 * Math.sin(2 * Mrad) +
+    0.0003 * Math.sin(3 * Mrad);
+  const lam = ((M + C + 180 + 102.9372) % 360 + 360) % 360;
+  const lamRad = (lam * Math.PI) / 180;
+  const Jtransit =
+    2451545.0 +
+    Jstar +
+    0.0053 * Math.sin(Mrad) -
+    0.0069 * Math.sin(2 * lamRad);
+  const sinDec = Math.sin(lamRad) * Math.sin((23.4397 * Math.PI) / 180);
+  const dec = Math.asin(sinDec);
+  const latRad = (lat * Math.PI) / 180;
+  const cosHa =
+    (Math.sin((-0.8333 * Math.PI) / 180) -
+      Math.sin(latRad) * Math.sin(dec)) /
+    (Math.cos(latRad) * Math.cos(dec));
+  if (cosHa < -1 || cosHa > 1) return null;
+  const Ha = (Math.acos(cosHa) * 180) / Math.PI;
+  const Jrise = Jtransit - Ha / 360;
+  const Jset = Jtransit + Ha / 360;
+  return {
+    sunrise: (Jrise - 2440587.5) * 86400000,
+    sunset: (Jset - 2440587.5) * 86400000,
+  };
 }
 
 const PERIODS = [
@@ -66,6 +107,8 @@ function tooltipFmt(days: number) {
 export default function SiteChart({
   siteId,
   siteName,
+  lat,
+  lon,
   emissivity = DEFAULT_EMISSIVITY,
 }: Props) {
   const [days, setDays] = useState<number>(DEFAULT_PERIOD);
@@ -109,10 +152,25 @@ export default function SiteChart({
             : null;
         const deltaT =
           skinTempC != null && p.ta != null ? +(skinTempC - p.ta).toFixed(2) : null;
-        return { ...p, skinTempC, deltaT };
+        return { ...p, skinTempC, deltaT, ts: new Date(p.timestamp).getTime() };
       }),
     [raw, emissivity]
   );
+
+  // Compute sunrise/sunset for every unique UTC day in the data (suppress for >30 days — too dense)
+  const sunLines = useMemo(() => {
+    if (days > 30 || data.length === 0) return [];
+    const seen = new Set<string>();
+    const lines: { sunrise: number; sunset: number }[] = [];
+    for (const p of data) {
+      const dateKey = p.timestamp.slice(0, 10);
+      if (seen.has(dateKey)) continue;
+      seen.add(dateKey);
+      const result = getSunTimes(new Date(dateKey + "T12:00:00Z"), lat, lon);
+      if (result) lines.push(result);
+    }
+    return lines;
+  }, [data, days, lat, lon]);
 
   const selectedPeriod = PERIODS.find((p) => p.days === days) ?? PERIODS[1];
 
@@ -304,15 +362,29 @@ export default function SiteChart({
 
           {/* ΔT chart */}
           <div className="mt-2">
-            <p className="text-xs text-stone-500 mb-1">
-              Skin − air temperature difference (ΔT)
-            </p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-stone-500">Skin − air temperature difference (ΔT)</p>
+              {sunLines.length > 0 && (
+                <span className="text-[10px] text-stone-400 flex items-center gap-2">
+                  <span style={{ color: "#f97316" }}>▏</span>Sunrise
+                  <span style={{ color: "#7c3aed" }}>▏</span>Sunset
+                </span>
+              )}
+            </div>
             <ResponsiveContainer width="100%" height={160}>
               <LineChart data={data} margin={{ top: 4, right: 52, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
                 <XAxis
-                  dataKey="timestamp"
-                  tickFormatter={tickFmt(days)}
+                  dataKey="ts"
+                  type="number"
+                  scale="time"
+                  domain={["dataMin", "dataMax"]}
+                  tickFormatter={(ts: number) => {
+                    const d = new Date(ts);
+                    if (days <= 1)  return format(d, "HH:mm");
+                    if (days <= 7)  return format(d, "dd MMM HH:mm");
+                    return format(d, "dd MMM");
+                  }}
                   tick={{ fontSize: 10, fill: "#78716c" }}
                   interval="preserveStartEnd"
                   minTickGap={days <= 1 ? 30 : days <= 7 ? 60 : 80}
@@ -324,7 +396,12 @@ export default function SiteChart({
                 />
                 <YAxis yAxisId="right" orientation="right" width={42} tick={false} />
                 <Tooltip
-                  labelFormatter={tooltipFmt(days)}
+                  labelFormatter={(ts: number) => {
+                    const d = new Date(ts);
+                    return days <= 7
+                      ? format(d, "HH:mm dd MMM")
+                      : format(d, "dd MMM yyyy");
+                  }}
                   formatter={(v: any) => {
                     if (v == null) return "—";
                     return [`${Number(v).toFixed(1)} °C`, "ΔT (skin − air)"];
@@ -339,11 +416,33 @@ export default function SiteChart({
                 />
                 {/* Zero reference line */}
                 <ReferenceLine y={0} stroke="#a8a29e" strokeDasharray="4 2" strokeWidth={1} />
+                {/* Sunrise lines (orange dotted) */}
+                {sunLines.map((s) => (
+                  <ReferenceLine
+                    key={`sr-${s.sunrise}`}
+                    x={s.sunrise}
+                    stroke="#f97316"
+                    strokeDasharray="3 3"
+                    strokeWidth={1}
+                    strokeOpacity={0.7}
+                  />
+                ))}
+                {/* Sunset lines (purple dotted) */}
+                {sunLines.map((s) => (
+                  <ReferenceLine
+                    key={`ss-${s.sunset}`}
+                    x={s.sunset}
+                    stroke="#7c3aed"
+                    strokeDasharray="3 3"
+                    strokeWidth={1}
+                    strokeOpacity={0.7}
+                  />
+                ))}
                 <Line
                   type="monotone"
                   dataKey="deltaT"
                   name="ΔT (skin − air)"
-                  stroke="#7c3aed"
+                  stroke="#0f172a"
                   dot={false}
                   connectNulls={false}
                   strokeWidth={1.5}

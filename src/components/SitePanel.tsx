@@ -129,7 +129,7 @@ export default function SitePanel({
         </p>
       </div>
 
-      <SiteChart siteId={site.siteId} siteName={site.siteName} emissivity={eps} />
+      <SiteChart siteId={site.siteId} siteName={site.siteName} lat={site.latitude} lon={site.longitude} emissivity={eps} />
 
       <div className="border-t border-stone-200 pt-3">
         <ScatterPanel
