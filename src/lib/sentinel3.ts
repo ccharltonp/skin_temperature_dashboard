@@ -3,27 +3,56 @@ const TOKEN_URL =
 const STATS_URL = "https://sh.dataspace.copernicus.eu/api/v1/statistics";
 
 let _tok: { t: string; exp: number } | null = null;
+let _tokenInflight: Promise<string> | null = null;
 
-async function getToken(): Promise<string> {
-  if (_tok && Date.now() < _tok.exp - 30_000) return _tok.t;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+async function fetchFreshToken(): Promise<string> {
   const id = process.env.SH_CLIENT_ID;
   const sec = process.env.SH_CLIENT_SECRET;
   if (!id || !sec) throw new Error("credentials_missing");
 
-  const r = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: id,
-      client_secret: sec,
-    }),
-    cache: "no-store",
-  });
-  if (!r.ok) throw new Error(`Token request failed: ${r.status}`);
-  const j = await r.json();
-  _tok = { t: j.access_token, exp: Date.now() + j.expires_in * 1000 };
-  return _tok.t;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await sleep(500 * 2 ** attempt); // 1s, 2s backoff
+    const r = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: id,
+        client_secret: sec,
+      }),
+      cache: "no-store",
+    });
+
+    if (r.ok) {
+      const j = await r.json();
+      _tok = { t: j.access_token, exp: Date.now() + j.expires_in * 1000 };
+      return _tok.t;
+    }
+
+    // 4xx = bad credentials — no point retrying
+    if (r.status >= 400 && r.status < 500) {
+      const body = await r.text().catch(() => "");
+      throw new Error(
+        `Sentinel Hub token auth failed (${r.status}): ${body.slice(0, 200)}`
+      );
+    }
+
+    // 5xx — transient; retry
+    console.error(`[sentinel3] token fetch ${r.status} attempt ${attempt + 1}/3`);
+  }
+
+  throw new Error("Sentinel Hub token request failed after 3 attempts (server error)");
+}
+
+async function getToken(): Promise<string> {
+  if (_tok && Date.now() < _tok.exp - 30_000) return _tok.t;
+  // Deduplicate concurrent refreshes in the same Lambda instance
+  if (!_tokenInflight) {
+    _tokenInflight = fetchFreshToken().finally(() => { _tokenInflight = null; });
+  }
+  return _tokenInflight;
 }
 
 export interface S3LSTObs {
@@ -50,14 +79,24 @@ function evaluatePixel(s) {
   return { lst: [s.LST], dataMask: [valid ? 1 : 0] };
 }`;
 
+async function statsRequest(body: unknown, token: string): Promise<Response> {
+  return fetch(STATS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    next: { revalidate: 1800 },
+  });
+}
+
 export async function fetchS3LSTTimeseries(
   lat: number,
   lon: number,
   fromISO: string,
   toISO: string
 ): Promise<S3LSTObs[]> {
-  const token = await getToken();
-
   // ~1.5 km half-width — wide enough to guarantee the site falls inside at
   // least one SLSTR pixel regardless of the pixel-grid phase offset
   const d = 0.015;
@@ -89,19 +128,35 @@ export async function fetchS3LSTTimeseries(
     },
   };
 
-  const r = await fetch(STATS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-    next: { revalidate: 1800 },
-  });
+  // Retry loop: up to 3 attempts with backoff.
+  // On 401, invalidate the cached token and re-fetch before retrying once.
+  let r: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await sleep(1000 * attempt);
+    const token = await getToken();
+    r = await statsRequest(body, token);
 
-  if (!r.ok) {
-    const msg = await r.text();
-    throw new Error(`Sentinel Hub Statistics API ${r.status}: ${msg}`);
+    if (r.ok) break;
+
+    if (r.status === 401) {
+      // Access token was rejected — force a fresh one on next iteration
+      console.error(`[sentinel3] Stats API 401 attempt ${attempt + 1}/3 — invalidating token`);
+      _tok = null;
+      continue;
+    }
+
+    if (r.status === 429 || r.status >= 500) {
+      console.error(`[sentinel3] Stats API ${r.status} attempt ${attempt + 1}/3`);
+      continue;
+    }
+
+    // 4xx other than 401/429: don't retry
+    break;
+  }
+
+  if (!r || !r.ok) {
+    const msg = await r?.text().catch(() => "") ?? "";
+    throw new Error(`Sentinel Hub Statistics API ${r?.status ?? "?"}: ${msg.slice(0, 300)}`);
   }
 
   const json = await r.json();
